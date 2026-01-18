@@ -417,5 +417,3 @@ FodyWeavers.xsd
 *.msm
 *.msp
 
-# Third Party libraries
-project/lib/wwise
