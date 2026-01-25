@@ -22,10 +22,24 @@ endif()
 
 project ("reaction-digital-mixing-desk")
 
+file(GLOB_RECURSE WWISE_INTEGRATION_SOURCES
+    "${WWISE_SDK_PATH}/samples/SoundEngine/Common/*.cpp"
+)
+if (WIN32)
+file(GLOB_RECURSE WWISE_PLATFORM_SOURCES
+    "${WWISE_SDK_PATH}/samples/SoundEngine/Win32/*.cpp"  # or Mac, depending on platform
+)
+else()
+file(GLOB_RECURSE WWISE_PLATFORM_SOURCES
+	"${WWISE_SDK_PATH}/samples/SoundEngine/POSIX/*.cpp"  # or Mac, depending on platform
+)
+endif()
 # Wwise Sound Engine Host is meant for separately testing the Sound Engine integration. It's not required for the plugin to work in REAPER.
 add_executable (WwiseSoundEngineHost 
 "src/private/WwiseSoundEngineHost.cpp" 
 "src/public/WwiseSoundEngine.h"
+${WWISE_INTEGRATION_SOURCES}
+${WWISE_PLATFORM_SOURCES}
 )
 
 # Reaction Mixing Desk Plugin for REAPER. This is the ultimate target and intended to be used within REAPER as an extension.
@@ -34,11 +48,24 @@ add_library (reaper_reaction-mixing-desk SHARED
 "src/public/ReactionMixingDesk.h"
 "src/public/MixingDeskCommands.h"
 "src/public/WAAPISynchronization.h"
+"src/public/WwiseSoundEngine.h"
+${WWISE_INTEGRATION_SOURCES}
+${WWISE_PLATFORM_SOURCES}
 )
 
 # Include directories
-target_include_directories(reaper_reaction-mixing-desk PUBLIC "${WWISE_SDK_PATH}/include" "include/wwise" "include/reaper-sdk" "include/reaper-sdk/sdk" "src/public" )
-target_include_directories(WwiseSoundEngineHost PUBLIC "${WWISE_SDK_PATH}/include" "include/public" "src/public")
+target_include_directories(reaper_reaction-mixing-desk PUBLIC 
+"${WWISE_SDK_PATH}/include" 
+"${WWISE_SDK_PATH}/samples" 
+"include/reaper-sdk" 
+"include/reaper-sdk/sdk" 
+"src/public" )
+
+target_include_directories(WwiseSoundEngineHost PUBLIC 
+"${WWISE_SDK_PATH}/include" 
+"${WWISE_SDK_PATH}/samples" 
+"include/public" 
+"src/public" )
 
 # Global Definitions
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -66,13 +93,13 @@ if (WIN32)
 			foreach (libfile IN LISTS WWISE_LIBS)
 				message(STATUS "Linking Debug Wwise libs to Debug configuration: ${libfile}")
 			endforeach()
-			target_link_libraries(WwiseSoundEngineHost PRIVATE ${WWISE_LIBS})
-			target_link_libraries(reaper_reaction-mixing-desk PRIVATE ${WWISE_LIBS})
+			target_link_libraries(WwiseSoundEngineHost PRIVATE ${WWISE_LIBS} ws2_32)
+			target_link_libraries(reaper_reaction-mixing-desk PRIVATE ${WWISE_LIBS} ws2_32)
 		# Use Profile configuration because we need to be able to communicate with the Sound Engine
 		elseif(CMAKE_BUILD_TYPE STREQUAL "Release")	
 			file(GLOB WWISE_LIBS "${WWISE_SDK_PATH}/x64_vc170/Profile/lib/*.lib")
-			target_link_libraries(WwiseSoundEngineHost PRIVATE ${WWISE_LIBS})
-			target_link_libraries(reaper_reaction-mixing-desk PRIVATE ${WWISE_LIBS})
+			target_link_libraries(WwiseSoundEngineHost PRIVATE ${WWISE_LIBS} ws2_32)
+			target_link_libraries(reaper_reaction-mixing-desk PRIVATE ${WWISE_LIBS} ws2_32)
 		else()
 			message(FATAL_ERROR "Unsupported build configuration. Use Debug or Release")
 		endif()

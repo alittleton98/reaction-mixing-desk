@@ -2,6 +2,23 @@
 #include "MixingDeskCommands.h"
 #include "ReactionMixingDesk.h"
 
+// Called every time a registered command is invoked
+bool HookCommand(int Command, int Flag)
+{
+	switch (Flag)
+	{
+		default:
+			break;
+	}
+	return true;
+}
+
+// Called approx every 30ms. Use to regularly sync information between Reaper and Wwise. Performance sensitive
+void TimerCommand()
+{
+
+}
+
 extern "C" REAPER_PLUGIN_DLL_EXPORT int REAPER_PLUGIN_ENTRYPOINT(REAPER_PLUGIN_HINSTANCE hInstance, reaper_plugin_info_t* reaperPluginInfo) {
 	if (!reaperPluginInfo) 
 	{
@@ -23,5 +40,7 @@ extern "C" REAPER_PLUGIN_DLL_EXPORT int REAPER_PLUGIN_ENTRYPOINT(REAPER_PLUGIN_H
 		return 0; 
 	}
 	
+	reaperPluginInfo->Register("hookcommand", (void*)HookCommand);
+
 	return 1; // Successful Initialization
 }
