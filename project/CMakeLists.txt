@@ -3,6 +3,7 @@
 #
 
 # Version setup
+set(CMAKE_CXX_STANDARD 17)
 cmake_minimum_required (VERSION 3.10)
 if (DEFINED ENV{WWISEVERSION})
   set (WWISE_SDK_PATH "C:/Program Files/Audiokinetic/Wwise$ENV{WWISEVERSION}/SDK") # Wwise version should fit the format MAJOR.MINOR.PATCH.BUILD. See the AK Launcher for the full version number
@@ -34,6 +35,7 @@ file(GLOB_RECURSE WWISE_PLATFORM_SOURCES
 	"${WWISE_SDK_PATH}/samples/SoundEngine/POSIX/*.cpp"  # or Mac, depending on platform
 )
 endif()
+
 # Wwise Sound Engine Host is meant for separately testing the Sound Engine integration. It's not required for the plugin to work in REAPER.
 add_executable (WwiseSoundEngineHost 
 "src/private/WwiseSoundEngineHost.cpp" 
@@ -53,6 +55,11 @@ ${WWISE_INTEGRATION_SOURCES}
 ${WWISE_PLATFORM_SOURCES}
 )
 
+add_executable (TestingConsole
+"src/private/TestingConsole.cpp"
+"src/private/Timeline.cpp"
+)
+
 # Include directories
 target_include_directories(reaper_reaction-mixing-desk PUBLIC 
 "${WWISE_SDK_PATH}/include" 
@@ -66,6 +73,13 @@ target_include_directories(WwiseSoundEngineHost PUBLIC
 "${WWISE_SDK_PATH}/samples" 
 "include/public" 
 "src/public" )
+
+target_include_directories(TestingConsole PUBLIC
+"include/rtmidi"
+"src/public"
+)
+
+target_compile_definitions(TestingConsole PRIVATE __WINDOWS_MM__=1)
 
 # Global Definitions
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -123,11 +137,16 @@ else()
   message(FATAL_ERROR "Unsupported platform")
 endif()
 
+target_link_libraries(TestingConsole PRIVATE "${CMAKE_SOURCE_DIR}/lib/rtmidi/rtmidi.lib")
+
+
 if (CMAKE_BUILD_TYPE STREQUAL "Release")
 	add_custom_command(TARGET reaper_reaction-mixing-desk POST_BUILD
 		COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:reaper_reaction-mixing-desk> "$ENV{REAPERPLUGINPATH}/$<TARGET_FILE_NAME:reaper_reaction-mixing-desk>"
 	)
 endif()
+
+
 
 if (CMAKE_VERSION VERSION_GREATER 3.12)
   set_property(TARGET WwiseSoundEngineHost PROPERTY CXX_STANDARD 20)

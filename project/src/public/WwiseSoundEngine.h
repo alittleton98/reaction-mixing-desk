@@ -1,7 +1,10 @@
+// Header for the inclusion and initialization of the Wwise Sound Engine as a standalone sound engine.
+// The engine is not assumed to running alongside the authoring tool, and is not expected to have a connection to the Wwise Authoring API (WAAPI), but is capable of doing so
+
 #pragma once
 #include "AK/SoundEngine/Common/AkSoundEngine.h"
-#include "AK/SOundEngine/Common/AkMemoryMgr.h"
-#include "AK/SOundEngine/Common/AkMemoryMgrModule.h"
+#include "AK/SoundEngine/Common/AkMemoryMgr.h"
+#include "AK/SoundEngine/Common/AkMemoryMgrModule.h"
 #include "AK/SoundEngine/Common/IAkStreamMgr.h"
 #include "AK/SoundEngine/Common/AkStreamMgrModule.h"
 #include "AK/Tools/Common/AkPlatformFuncs.h"
@@ -15,6 +18,7 @@
 #include "SoundEngine/POSIX/AkDefaultIOHookDeferred.h"
 #endif
 #include <cassert>
+#include <string.h>
 
 CAkDefaultIOHookDeferred g_WwiseIOHook;
 
@@ -82,6 +86,7 @@ bool InitializeWwiseSoundEngine()
 	// Init WAAPI comms
 	AkCommSettings commSettings;
 	AK::Comm::GetDefaultInitSettings(commSettings);
+	strcpy_s(commSettings.szAppNetworkName, "Waffles");
 	if (AK::Comm::Init(commSettings) != AK_Success)
 	{
 #if DEBUG_CONFIG
@@ -111,3 +116,62 @@ void TerminateWwiseSoundEngine()
 	// Terminate the Memory Manager. Has to be done last
 	AK::MemoryMgr::Term();
 }
+
+// Main Timing Loop of the host application. 
+bool MainHostLoop()
+{
+
+
+	AK::SoundEngine::RenderAudio();
+	return true;
+}
+
+/// Setup Emitter and Listener game objects for spatial audio rendering
+/// Only one listener is supported
+bool SetupListener()
+{
+	return true;
+}
+
+// For each registered emitter game object, set its starting position and orientation
+bool SetupEmitters()
+{
+	return true;
+}
+
+
+/// Register the game object with Wwise Sound Engine.
+bool SetupSpatialAudioEnvironment()
+{
+	return true;
+}
+
+/// Post an AkAudioEvent to the registered game object.
+bool PostAkAudioEvent()
+{
+	return true;
+}
+
+/// Pauses the Wwise Sound Engine playback. All audio that is currently playing will be paused.
+/// The transport is assumed to have paused at the current position in the timeline.
+bool PauseWwisePlayback()
+{
+	return true;
+}
+
+
+/// Clear existing playback for all registered game objects.
+/// Called when the transport is stopped or reset. The transport is assumed to have reset to the beginning of the timeline when this is called. 
+/// If the transport is played from a position other than the beginning of the timeline, only the events following the seeked position will be posted.
+bool ClearWwisePlayback()
+{
+	AK::SoundEngine::StopAll();
+	return true;
+	
+}
+
+void SetupWwiseConnection()
+{
+	AK::Comm::GetCurrentSettings();
+}
+
