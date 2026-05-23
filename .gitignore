@@ -417,3 +417,7 @@ FodyWeavers.xsd
 *.msm
 *.msp
 
+wwise_projects/
+project/include/
+project/lib/
+project/out/

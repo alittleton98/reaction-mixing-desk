@@ -1,101 +1,28 @@
-/*
-Digital Wave Research Lab - Reaction Mixing Desk
-Reaper Plugin to run a Wwise Sound Engine simulation and lineraly track a Wwise Profiling session.
-Copyright (C) 2026 Reaction Digital LLC
-*/ 
-
-#include "reaper_plugin.h"
-#include "reaper_plugin_functions.h"
-
-namespace ReactionMixingDesk
+// Primary Reaction Mixing Desk application
+// Launches the desk and initializes the core modules
+// Allows for use of a config file
+#pragma once
+#include "Audio/SoundEngine.h"
+// Note that available channels are always channel count - 8 to account for the Master Bus which is always 7.1. Master is always represented as linked multimono
+enum EMixingDeskSetup
 {
-	// SSL UC1 Channel Strip Plugin Values Mapping. These values are the ones monitored for the selected track's channel strip plugin instance.
-	static struct ChannelStripPluginValues
-	{
-		float InputGain;				// Wwise Bus Voice Volume
-		float OutputGain;				// Wwise Bus EQ Output Gain
-		float LowPassFrequency;			// Wwise Bus LPF
-		float HighPassFrequency;		// Wwise Bus HPF
-		float HighShelfFrequency;		// Wwise Bus EQ High Shelf Frequency
-		float HighShelfGain;			// Wwise Bus EQ High Shelf Gain
-		float MidPeakFrequency;			// Wwise Bus EQ Mid Peak Frequency
-		float MidPeakGain;				// Wwise Bus EQ Mid Peak Gain
-		float MidPeakQ;					// Wwise Bus EQ Mid Peak Q	
-		float LowShelfFrequency;		// Wwise Bus EQ Low Shelf Frequency
-		float LowShelfGain;				// Wwise Bus EQ Low Shelf Gain
-		float CompressorThreshold;		// Wwise Bus Compressor Threshold
-		float CompressorRatio;			// Wwise Bus Compressor Ratio
-		float CompressorAttack;			// Wwise Bus Compressor Attack
-		float CompressorRelease;		// Wwise Bus Compressor Release
-		float CompressorMakeUpGain;		// Wwise Bus Compressor Output Gain
-		bool bBypassEQ;					// Wwise Bus EQ Bypass
-		bool bBypassCompressor;			// Wwise Bus Compressor Bypass
-	};
+	MONO_NATIVE_64,				// Busses are loaded as Mono, Native Channel Strip 2, Bus Compressor, and 56 Channel I/O with 8 Channel Master
+	MONO_4000G_64,				// Busses are loaded as Mono, 4KG Channel Strip, Bus Compressor, and 56 Channel I/O with 8 Channel Master
+	MONO_4000E_64,				// Busses are loaded as Mono, 4KE Channel Strip, Bus Compressor, and 56 Channel I/O with 8 Channel Master
+	STEREO_NATIVE_64,			// Busses are loaded as Stereo, Native Channel Strip 2, Bus Compressor, and 56 Channel I/O with 8 Channel Master. Channels are represented in pairs except the Master 
+	STEREO_4000G_64,			// Busses are loaded as Stereo, 4KG Channel Strip, Bus Compressor, and 56 Channel I/O with 8 Channel Master. Channels are represented in pairs except the Master 
+	STEREO_4000E_64,			// Busses are loaded as Stereo, 4KE Channel Strip, Bus Compressor, and 56 Channel I/O with 8 Channel Master. Channels are represented in pairs except the Master 
+	MONO_NATIVE_256,			// Busses are loaded as Mono, Native Channel Strip 2, Bus Compressor, and 56 Channel I/O with 8 Channel Master
+	MONO_4000G_256,				// Busses are loaded as Mono, Native Channel Strip 2, Bus Compressor, and 56 Channel I/O with 8 Channel Master
+	MONO_4000E_256,				// Busses are loaded as Mono, Native Channel Strip 2, Bus Compressor, and 56 Channel I/O with 8 Channel Master
+	STEREO_NATIVE_256,			// Busses are loaded as Stereo, Native Channel Strip 2, Bus Compressor, and 56 Channel I/O with 8 Channel Master. Channels are represented in pairs except the Master 
+	STEREO_4000G_256,			// Busses are loaded as Stereo, Native Channel Strip 2, Bus Compressor, and 56 Channel I/O with 8 Channel Master. Channels are represented in pairs except the Master 
+	STEREO_4000E_256,			// Busses are loaded as Stereo, Native Channel Strip 2, Bus Compressor, and 56 Channel I/O with 8 Channel Master. Channels are represented in pairs except the Master 
+	WWISE_SOUNDENGINE_NOREC,	// Busses are loaded as multi mono channels based on the loaded wwise project. Output device is not initialized as the mixing desk will serve primarily as a control surface
+	WWISE_SOUNDENGINE_REC,		// Busses are loaded as multi mono channels based on the loaded wwise project. Output device is initialized, but uses an extra midi layer for control of both ends of the desk. 
+	WWISE_CONTROLSURFACE
+};
 
-	// Reaper Actions
-	custom_action_register_t Action_InitializeAll =
-	{
-		0,
-		"REACTION_MIXING_DESK_INITIALIZE_ALL",
-		"Reaction Mixing Desk: Initialize All Wwise Functionality",
-		nullptr
-	};
-
-	custom_action_register_t Action_InitializeWwiseSoundEngine =
-	{
-		0,
-		"REACTION_MIXING_DESK_INITIALIZE_WWISE_SOUND_ENGINE",
-		"Reaction Mixing Desk: Initialize Wwise Sound Engine",
-		nullptr
-	};
-
-	custom_action_register_t Action_DeinitializeWwiseSoundEngine =
-	{
-		0,
-		"REACTION_MIXING_DESK_DEINITIALIZE_WWISE_SOUND_ENGINE",
-		"Reaction Mixing Desk: Deinitialize Wwise Sound Engine",
-		nullptr
-	};
-
-	custom_action_register_t Action_LoadWwiseProfilingData =
-	{
-		0,
-		"REACTION_MIXING_DESK_LOAD_WWISE_PROFILING_DATA",
-		"Reaction Mixing Desk: Load Wwise Profiling Data",
-		nullptr
-	};
-
-	custom_action_register_t Action_ConnectToWwiseAuthoring =
-	{
-		0,
-		"REACTION_MIXING_DESK_CONNECT_TO_WWISE_AUTHORING",
-		"Reaction Mixing Desk: Connect to Wwise Authoring",
-		nullptr
-	};
-
-	custom_action_register_t Action_LoadWwiseProjectMixingDesk =
-	{
-		0,
-		"REACTION_MIXING_DESK_LOAD_WWISE_PROJECT_MIXING_DESK",
-		"Reaction Mixing Desk: Load Wwise Project Mixing Desk",
-		nullptr
-	};
-
-	custom_action_register_t Action_StartMonitoringReaperSession =
-	{
-		0,
-		"REACTION_MIXING_DESK_START_MONITORING_REAPER_SESSION",
-		"Reaction Mixing Desk: Start Monitoring Reaper Session",
-		nullptr
-	};
-
-	custom_action_register_t Action_StopMonitoringReaperSession =
-	{
-		0,
-		"REACTION_MIXING_DESK_STOP_MONITORING_REAPER_SESSION",
-		"Reaction Mixing Desk: Stop Monitoring Reaper Session",
-		nullptr
-	};
-}
+SoundEngine* gSoundEngine = nullptr;
 
 

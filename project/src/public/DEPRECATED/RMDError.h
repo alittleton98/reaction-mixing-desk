@@ -1,5 +1,7 @@
+#pragma once
 #include <cstring>
 #include <iostream>
+
 // Error Specifications for the ReactionMixingDesk program
 
 using namespace std;
