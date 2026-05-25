@@ -113,6 +113,8 @@ ${WWISE_INTEGRATION_SOURCES}
 ${WWISE_PLATFORM_SOURCES}
 )		
 
+
+
 target_include_directories(ReactionMixingDesk PUBLIC "${WWISE_SDK_PATH}/include" 
 "${WWISE_SDK_PATH}/samples" "src/public" "include/vst3sdk" "include/asiosdk/common" "include/asiosdk/host" "include")
 #target_link_libraries(ReactionMixingDesk PRIVATE "libfftw3-3" "libfftw3f-3" "libfftw3l-3" ws2_32)
@@ -166,8 +168,7 @@ target_compile_definitions( ReactionMixingDesk PRIVATE
     VST_SSL_NATIVE_BUSCOMPRESSOR="${VST_SSL_NATIVE_BUSCOMPRESSOR}"
     VST_SSL_METER="${VST_SSL_METER}"
 )
-
-
+target_link_libraries(ReactionMixingDesk  PRIVATE "${CMAKE_SOURCE_DIR}/lib/rtmidi/rtmidi.lib")
 # Link Libararies
 if (WIN32)
 	# 64-bit

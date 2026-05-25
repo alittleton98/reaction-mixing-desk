@@ -47,21 +47,29 @@ class AudioChannel;
 
 class SoundEngine : public Vst::HostApplication
 {
+
 public:
+	static SoundEngine gSoundEngine;
+	static SoundEngine* GetSoundEngine() { return &SoundEngine::gSoundEngine; }
+
 	ASIOCallbacks Callbacks;
 public:
 	// Start up/Shut down
-	bool LoadSoundEngineConfiguration();
-	bool InitializeASIODevice( EAsioDevice ChosenAsioDevice );
+	bool LoadSoundEngineConfiguration( EMixingDeskOperatingMode OperatingMode );
+	bool InitializeASIODevice();
 	bool InitializeSignalChain();
 	bool InitializeControlSurface();
 	bool InitializeWwiseSoundEngine();
-	bool InitializeWwiseComms();
+	bool LinkToWwiseAuthoring();
 	bool TerminateWwiseSoundEngine();
 	bool TerminateWwiseComms();
 	bool TerminateSoundEngine();
+	bool TerminateControlSurface();
 	bool IsFullyInitialized() { return false; };
 	bool ReloadSoundEngine();
+
+	// 
+	bool Tick( float DeltaTime );
 
 	// ASIO Implementation
 	bool LoadAsioDriver( EAsioDevice ChosenAsioDevice );
@@ -74,7 +82,6 @@ public:
 
 	// Signal Chain
 	bool ProcessSignalChain();
-	// Vst::IHostApplication Interface
 
 	// Wwise implementation
 	AKRESULT SetupListener();
@@ -91,8 +98,11 @@ public:
 	AKRESULT SetStateValue();
 	AKRESULT SetSwitchValue();
 	AKRESULT SetRtpcValue();
-
 	// Memory
+
+	// Function
+	bool StartSoundEngine();
+	/*bool TickSoundEngine( float DeltaTime );*/
 
 private:
 	// Wwise
@@ -104,6 +114,9 @@ private:
 	bool signalChainInitialized = false;
 	bool wwiseSoundEngineInitialized = false;
 	bool wwiseCommsInitialized = false;
+	bool bShouldUseAsioAsTimingMechanism = true;
+	bool bShouldLoadAudioProcessing = false;
+	bool bShouldLoadWwiseSoundEngine = false;
 
 	// Mixing Desk Setup
 	EAsioDevice SelectedAsioDevice;

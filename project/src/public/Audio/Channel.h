@@ -13,6 +13,8 @@
 #include "public.sdk/source/vst/hosting/module.h"
 #include "public.sdk/source/vst/hosting/plugprovider.h"
 #include "base/source/fdebug.h"
+#include "AK/SoundEngine/Common/AkTypes.h"
+
 
 using namespace Steinberg;
 using namespace VST3::Hosting;
@@ -27,6 +29,12 @@ struct FChannelStripEffect
 	ClassInfo classInfo;
 };
 
+struct FChannelStripWwiseParameters
+{
+	int busObjectID = AK_INVALID_UNIQUE_ID;
+
+};
+
 class AudioChannel : public Vst::IComponentHandler
 {
 public:
@@ -37,11 +45,11 @@ public:
 		Module::Ptr inMeterModule
 	);
 
-	bool InitializeChannel( SoundEngine* inSoundEngine );
+	bool InitializeChannel( SoundEngine* inSoundEngine, EChannelConfiguration inChannelConfig, bool bUseBusCompressor, bool bUseMeter );
 	bool ProcessAudioForChannel();
-	bool StartChannelStrip( PluginFactory inChannelStripFactory, SoundEngine* inSoundEngine );
-	bool StartDynamics( PluginFactory inDynamicsFactory, SoundEngine* inSoundEngine );
-	bool StartMeter( PluginFactory inMeterFactory, SoundEngine* inSoundEngine );
+	bool StartChannelStrip( PluginFactory inChannelStripFactory, SoundEngine* inSoundEngine, EChannelConfiguration inChannelConfig );
+	bool StartDynamics( PluginFactory inDynamicsFactory, SoundEngine* inSoundEngine, EChannelConfiguration inChannelConfig );
+	bool StartMeter( PluginFactory inMeterFactory, SoundEngine* inSoundEngine, EChannelConfiguration inChannelConfig );
 	FChannelStripEffect ChannelStripEffect;
 	FChannelStripEffect DynamicsEffect;
 	FChannelStripEffect MeterEffect;
@@ -102,6 +110,7 @@ private:
 	Vst::ProcessData ChannelProcessData;
 	Vst::SampleRate ChannelSampleRate;
 	int ChannelBlockSize;
+	int wwiseObjectID = AK_INVALID_UNIQUE_ID;
 	//HWND hwnd;
 };
 

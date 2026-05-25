@@ -3,25 +3,151 @@
 #include "Audio/Channel.h"
 #include "public.sdk/source/common/memorystream.h"
 #include <windows.h>
-#include "public.sdk/source/common/memorystream.h"
 #include "base/source/fobject.h"
 #include "pluginterfaces/vst/ivstplugview.h"
 #include "pluginterfaces/gui/iplugview.h"  
 #include <format>
+#include "Ak/WwiseAuthoringAPI/waapi.h"
+#include "pluginterfaces/vst/ivstmessage.h"
+#include "pluginterfaces/vst/ivsthostapplication.h"
+#include "pluginterfaces/vst/vsttypes.h"
 
+SoundEngine SoundEngine::gSoundEngine;
 
-bool SoundEngine::LoadSoundEngineConfiguration()
+bool SoundEngine::LoadSoundEngineConfiguration( EMixingDeskOperatingMode OperatingMode )
 {
-	SelectedAsioDevice = EAsioDevice::VASIO_256;
-	SelectedChannelConfiguration = EChannelConfiguration::MONO;
-	SelectedChannelStripModel = EChannelStripModel::NATIVE;
+	switch ( OperatingMode )
+	{
+		case EMixingDeskOperatingMode::MONO_NATIVE_64:
+			SelectedAsioDevice = EAsioDevice::VASIO_64;
+			SelectedChannelConfiguration = EChannelConfiguration::MONO;
+			SelectedChannelStripModel = EChannelStripModel::NATIVE;
+			bShouldLoadAudioProcessing = true;
+			bShouldLoadWwiseSoundEngine = false;
+			bShouldUseAsioAsTimingMechanism = true;
+			break;
+		case EMixingDeskOperatingMode::MONO_NATIVE_256:
+			SelectedAsioDevice = EAsioDevice::VASIO_256;
+			SelectedChannelConfiguration = EChannelConfiguration::MONO;
+			SelectedChannelStripModel = EChannelStripModel::NATIVE;
+			bShouldLoadAudioProcessing = true;
+			bShouldLoadWwiseSoundEngine = false;
+			bShouldUseAsioAsTimingMechanism = true;
+			break;
+		case EMixingDeskOperatingMode::MONO_4000G_64:
+			SelectedAsioDevice = EAsioDevice::VASIO_64;
+			SelectedChannelConfiguration = EChannelConfiguration::MONO;
+			SelectedChannelStripModel = EChannelStripModel::FOUR_THOUSAND_G;
+			bShouldLoadAudioProcessing = true;
+			bShouldLoadWwiseSoundEngine = false;
+			bShouldUseAsioAsTimingMechanism = true;
+			break;
+		case EMixingDeskOperatingMode::MONO_4000G_256:
+			SelectedAsioDevice = EAsioDevice::VASIO_256;
+			SelectedChannelConfiguration = EChannelConfiguration::MONO;
+			SelectedChannelStripModel = EChannelStripModel::FOUR_THOUSAND_G;
+			bShouldLoadAudioProcessing = true;
+			bShouldLoadWwiseSoundEngine = false;
+			bShouldUseAsioAsTimingMechanism = true;
+			break;
+		case EMixingDeskOperatingMode::MONO_4000E_64:
+			SelectedAsioDevice = EAsioDevice::VASIO_64;
+			SelectedChannelConfiguration = EChannelConfiguration::MONO;
+			SelectedChannelStripModel = EChannelStripModel::FOUR_THOUSAND_E;
+			bShouldLoadAudioProcessing = true;
+			bShouldLoadWwiseSoundEngine = false;
+			bShouldUseAsioAsTimingMechanism = true;
+			break;
+		case EMixingDeskOperatingMode::MONO_4000E_256:
+			SelectedAsioDevice = EAsioDevice::VASIO_256;
+			SelectedChannelConfiguration = EChannelConfiguration::MONO;
+			SelectedChannelStripModel = EChannelStripModel::FOUR_THOUSAND_E;
+			bShouldLoadAudioProcessing = true;
+			bShouldLoadWwiseSoundEngine = false;
+			bShouldUseAsioAsTimingMechanism = true;
+			break;
+		case EMixingDeskOperatingMode::STEREO_NATIVE_64:
+			SelectedAsioDevice = EAsioDevice::VASIO_64;
+			SelectedChannelConfiguration = EChannelConfiguration::STEREO;
+			SelectedChannelStripModel = EChannelStripModel::NATIVE;
+			bShouldLoadAudioProcessing = true;
+			bShouldLoadWwiseSoundEngine = false;
+			bShouldUseAsioAsTimingMechanism = true;
+			break;
+		case EMixingDeskOperatingMode::STEREO_NATIVE_256:
+			SelectedAsioDevice = EAsioDevice::VASIO_256;
+			SelectedChannelConfiguration = EChannelConfiguration::STEREO;
+			SelectedChannelStripModel = EChannelStripModel::NATIVE;
+			bShouldLoadAudioProcessing = true;
+			bShouldLoadWwiseSoundEngine = false;
+			bShouldUseAsioAsTimingMechanism = true;
+			break;
+		case EMixingDeskOperatingMode::STEREO_4000G_64:
+			SelectedAsioDevice = EAsioDevice::VASIO_64;
+			SelectedChannelConfiguration = EChannelConfiguration::STEREO;
+			SelectedChannelStripModel = EChannelStripModel::FOUR_THOUSAND_G;
+			bShouldLoadAudioProcessing = true;
+			bShouldLoadWwiseSoundEngine = false;
+			bShouldUseAsioAsTimingMechanism = true;
+			break;
+		case EMixingDeskOperatingMode::STEREO_4000G_256:
+			SelectedAsioDevice = EAsioDevice::VASIO_256;
+			SelectedChannelConfiguration = EChannelConfiguration::STEREO;
+			SelectedChannelStripModel = EChannelStripModel::FOUR_THOUSAND_G;
+			bShouldLoadAudioProcessing = true;
+			bShouldLoadWwiseSoundEngine = false;
+			bShouldUseAsioAsTimingMechanism = true;
+			break;
+		case EMixingDeskOperatingMode::STEREO_4000E_64:
+			SelectedAsioDevice = EAsioDevice::VASIO_64;
+			SelectedChannelConfiguration = EChannelConfiguration::STEREO;
+			SelectedChannelStripModel = EChannelStripModel::FOUR_THOUSAND_E;
+			bShouldLoadAudioProcessing = true;
+			bShouldLoadWwiseSoundEngine = false;
+			bShouldUseAsioAsTimingMechanism = true;
+			break;
+		case EMixingDeskOperatingMode::STEREO_4000E_256:
+			SelectedAsioDevice = EAsioDevice::VASIO_256;
+			SelectedChannelConfiguration = EChannelConfiguration::STEREO;
+			SelectedChannelStripModel = EChannelStripModel::FOUR_THOUSAND_E;
+			bShouldLoadAudioProcessing = true;
+			bShouldLoadWwiseSoundEngine = false;
+			bShouldUseAsioAsTimingMechanism = true;
+			break;
+		case EMixingDeskOperatingMode::WWISE_CONTROL_SURFACE:
+			SelectedAsioDevice = EAsioDevice::NONE;
+			SelectedChannelConfiguration = EChannelConfiguration::MONO;
+			SelectedChannelStripModel = EChannelStripModel::FOUR_THOUSAND_E;
+			bShouldLoadAudioProcessing = false;
+			bShouldLoadWwiseSoundEngine = false;
+			bShouldUseAsioAsTimingMechanism = false;
+			break;
+		case EMixingDeskOperatingMode::WWISE_SOUNDENGINE_RECORD_EXTERNAL:
+			SelectedAsioDevice = EAsioDevice::NONE;
+			SelectedChannelConfiguration = EChannelConfiguration::MONO;
+			SelectedChannelStripModel = EChannelStripModel::FOUR_THOUSAND_E;
+			bShouldLoadAudioProcessing = true;
+			bShouldLoadWwiseSoundEngine = false;
+			bShouldUseAsioAsTimingMechanism = true;
+			break;
+		case EMixingDeskOperatingMode::WWISE_SOUNDENGINE_RECORD_INTERNAL:
+			SelectedAsioDevice = EAsioDevice::NONE;
+			SelectedChannelConfiguration = EChannelConfiguration::MONO;
+			SelectedChannelStripModel = EChannelStripModel::FOUR_THOUSAND_E;
+			bShouldLoadAudioProcessing = true;
+			bShouldLoadWwiseSoundEngine = true;
+			bShouldUseAsioAsTimingMechanism = true;
+			break;
+		default:
+			break;
+	}
 	return true;
 }
 
-bool SoundEngine::InitializeASIODevice( EAsioDevice ChosenAsioDevice )
+bool SoundEngine::InitializeASIODevice()
 {
 	asioInitialized = false;
-	if ( !LoadAsioDriver( ChosenAsioDevice ) )
+	if ( !LoadAsioDriver( SelectedAsioDevice ) )
 		return asioInitialized;
 
 	if ( ASIOInit( &DriverInfo ) != ASE_OK )
@@ -43,6 +169,31 @@ bool SoundEngine::InitializeASIODevice( EAsioDevice ChosenAsioDevice )
 	asioInitialized = true;
 
 	return asioInitialized;
+}
+
+void OnSampleRateChange( ASIOSampleRate SampleRate )
+{
+
+}
+
+// Asio device buffer switch. Happens every time the buffers are swapped out
+ASIOTime* OnBufferSwitchTimeInfo( ASIOTime* Parameters, long DoubleBufferIndex, ASIOBool DirectProcess )
+{
+	if ( AK::SoundEngine::IsInitialized() )
+		AK::SoundEngine::RenderAudio();
+
+	if ( !SoundEngine::GetSoundEngine() )
+		return Parameters;
+
+	SoundEngine::GetSoundEngine()->ProcessSignalChain();
+	//SoundEngine::GetSoundEngine()->TickSoundEngine( -1.f );
+
+	return Parameters;
+}
+
+long OnAsioMessage( long Selector, long Value, void* Message, double* opt )
+{
+	return 0;
 }
 
 bool SoundEngine::InitializeSignalChain()
@@ -101,11 +252,31 @@ bool SoundEngine::InitializeSignalChain()
 
 	Vst::PluginContextFactory::instance().setPluginContext( this );
 
-	for ( int indexChannels = 0; indexChannels < 4; indexChannels++ )
+	int totalInstances = 0;
+	switch ( SelectedChannelConfiguration )
+	{
+		case EChannelConfiguration::MONO:
+			totalInstances = inputChannels;
+			break;
+		case EChannelConfiguration::STEREO:
+			totalInstances = inputChannels / 2;;
+			break;
+		case EChannelConfiguration::QUAD:
+			totalInstances = inputChannels / 4;
+			break;
+		case EChannelConfiguration::SURROUND:
+			totalInstances = inputChannels / 6;
+			break;
+		case EChannelConfiguration::SURROUND_REAR:
+			totalInstances = inputChannels / 6;
+			break;
+	}
+
+	for ( int indexChannels = 0; indexChannels < totalInstances; indexChannels++ )
 	{
 		AudioChannel* newChannel = new AudioChannel();
 		newChannel->ChannelName = "Track " + indexChannels;
-
+		printf( "Initializing Channel % i : % s", indexChannels, newChannel->ChannelName );
 		switch ( SelectedChannelStripModel )
 		{
 			case EChannelStripModel::NATIVE:
@@ -121,7 +292,7 @@ bool SoundEngine::InitializeSignalChain()
 				break;
 		}
 
-		if ( !newChannel->InitializeChannel( this ) )
+		if ( !newChannel->InitializeChannel( this, SelectedChannelConfiguration, false, false ) )
 		{
 #if DEBUG_CONFIG
 			assert( "Failed to initialize Channel %i : %s", indexChannels, newChannel->ChannelName );
@@ -141,6 +312,8 @@ bool SoundEngine::ProcessSignalChain()
 
 bool SoundEngine::InitializeControlSurface()
 {
+	// Connect to MIDI device for SSL Channel 1
+
 	return false;
 }
 
@@ -222,8 +395,9 @@ bool SoundEngine::InitializeWwiseSoundEngine()
 	return wwiseSoundEngineInitialized;
 }
 
-bool SoundEngine::InitializeWwiseComms()
+bool SoundEngine::LinkToWwiseAuthoring()
 {
+
 	return false;
 }
 
