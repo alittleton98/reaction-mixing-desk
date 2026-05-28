@@ -7,6 +7,7 @@
 #include "base/source/fstring.h"
 #include "pluginterfaces/vst/ivstattributes.h"
 #include "pluginterfaces/vst/vstspeaker.h"
+#include "pluginterfaces/vst/ivstmessage.h"
 
 void AudioChannel::SetModules( VST3::Hosting::Module::Ptr inChannelStripModule, VST3::Hosting::Module::Ptr inDynamicsModule, VST3::Hosting::Module::Ptr inMeterModule
 )
@@ -184,39 +185,35 @@ bool AudioChannel::StartChannelStrip( PluginFactory inChannelStripFactory, Sound
 	if ( compCP ) compCP->release();
 	if ( ctrlCP ) ctrlCP->release();
 
-	//for ( int indexParameter = 0; indexParameter < ChannelStripEffect.editControllerPtr->getParameterCount(); indexParameter++ )
-	//{
-	//	Vst::ParameterInfo parameter;
-	//	if ( ChannelStripEffect.editControllerPtr->getParameterInfo( indexParameter, parameter ) == kResultTrue )
-	//	{
-	//		std::wstring wstr_title( parameter.title, parameter.title + 128 );
-	//		wstr_title = wstr_title.substr( 0, wstr_title.find( L'\0' ) );
+	Vst::ChannelContext::IInfoListener* infoListener = nullptr;
+	if ( ChannelStripEffect.editControllerPtr->queryInterface(
+		Vst::ChannelContext::IInfoListener::iid, (void**)&infoListener ) == kResultOk
+		&& infoListener )
+	{
+		// 2. Build the attribute list
+		IPtr<Vst::IAttributeList> attrList = Vst::HostAttributeList::make();
+		if ( attrList )
+		{
+			// Channel name — STR16 produces a const TChar* (UTF-16)
+			const Vst::TChar* channelName = STR16( "Test Channel" );
 
-	//		/*std::wcout << "Param ID: " << parameter.id
-	//			<< " |Name: " << wstr_title
-	//			<< " |Default: " << parameter.defaultNormalizedValue
-	//			<< std::endl;*/
-	//	}
+			// Compute character count manually (no wcslen dependency)
+			int64 nameLen = 0;
+			while ( channelName[ nameLen ] != Vst::TChar( 0 ) ) ++nameLen;
 
-	//}
+			attrList->setString( Vst::ChannelContext::kChannelNameKey, channelName );
+			attrList->setInt( Vst::ChannelContext::kChannelNameLengthKey, nameLen );
 
-	//Vst::ChannelContext::IInfoListener* infoListener = nullptr;
-	//ChannelStripEffect.componentPtr->queryInterface(
-	//	Vst::ChannelContext::IInfoListener::iid,
-	//	(void**)&infoListener
-	//);
+			// Channel index (1-based) and color (ARGB)
+			attrList->setInt( Vst::ChannelContext::kChannelIndexKey, (int64)1 );
+			attrList->setInt( Vst::ChannelContext::kChannelColorKey, (int64)0xFF29A3CC );
 
-	//if ( !infoListener )
-	//{
-	//	printf( "[VST3] IInfoListener not supported\n" );
-	//	return false;
-	//}
+			// Push to the plugin
+			infoListener->setChannelContextInfos( attrList );
+		}
+		infoListener->release();
+	}
 
-	//// Communicate attribute list
-
-	//inSoundEngine->
-
-		//infoListener->release();
 
 	IPlugView* view = nullptr;
 	if ( ChannelStripEffect.editControllerPtr )
@@ -240,9 +237,8 @@ bool AudioChannel::StartChannelStrip( PluginFactory inChannelStripFactory, Sound
 			{
 				view->attached( hwnd, kPlatformTypeHWND );
 			}
-
-			view->release();
-			//DestroyWindow( hwnd );
+			//ShowWindow( hwnd, SW_SHOW );
+			//view->release();
 		}
 	}
 

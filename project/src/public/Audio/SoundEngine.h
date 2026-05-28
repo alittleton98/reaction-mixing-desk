@@ -30,6 +30,11 @@
 #include <string.h>
 #include "Common.h"
 
+#include "rtmidi/RtMidi.h"
+#include "Control Surface/ControlSurface.h"
+
+
+
 void OnSampleRateChange( ASIOSampleRate SampleRate );
 ASIOTime* OnBufferSwitchTimeInfo( ASIOTime* Parameters, long DoubleBufferIndex, ASIOBool DirectProcess );
 long OnAsioMessage( long Selector, long Value, void* Message, double* opt );
@@ -56,11 +61,14 @@ public:
 public:
 	// Start up/Shut down
 	bool LoadSoundEngineConfiguration( EMixingDeskOperatingMode OperatingMode );
+	bool InitializeSoundEngine();
+
 	bool InitializeASIODevice();
 	bool InitializeSignalChain();
 	bool InitializeControlSurface();
 	bool InitializeWwiseSoundEngine();
 	bool LinkToWwiseAuthoring();
+
 	bool TerminateWwiseSoundEngine();
 	bool TerminateWwiseComms();
 	bool TerminateSoundEngine();
@@ -68,8 +76,10 @@ public:
 	bool IsFullyInitialized() { return false; };
 	bool ReloadSoundEngine();
 
-	// 
-	bool Tick( float DeltaTime );
+	// Timing Threads
+	bool FreeClockThread();
+	bool AsioClockThread();
+	bool PluginMessageThread();
 
 	// ASIO Implementation
 	bool LoadAsioDriver( EAsioDevice ChosenAsioDevice );
@@ -83,7 +93,7 @@ public:
 	// Signal Chain
 	bool ProcessSignalChain();
 
-	// Wwise implementation
+	// Wwise Sound Engine implementation
 	AKRESULT SetupListener();
 	AKRESULT RegisterGameObject();
 	AKRESULT UnregisterGameObject();
@@ -98,12 +108,19 @@ public:
 	AKRESULT SetStateValue();
 	AKRESULT SetSwitchValue();
 	AKRESULT SetRtpcValue();
+
+
+	// Control Surface
+	void MidiCallback( double deltatime, std::vector<unsigned char>* message, void* userData );
+
 	// Memory
 
-	// Function
-	bool StartSoundEngine();
-	/*bool TickSoundEngine( float DeltaTime );*/
-
+	// Transport
+	bool Record();
+	bool Play();
+	bool Pause();
+	bool Forward();
+	bool Rewind();
 private:
 	// Wwise
 	string ProjectPath;
@@ -171,6 +188,7 @@ private:
 
 
 	// VST3
+	VST3::Hosting::Module::Ptr module_sslNativeChannelStripLink;
 	VST3::Hosting::Module::Ptr module_sslNativeChannelStrip2;
 	VST3::Hosting::Module::Ptr module_sslFourKEChannelStrip;
 	VST3::Hosting::Module::Ptr module_sslFourKGChannelStrip;
@@ -178,8 +196,8 @@ private:
 	VST3::Hosting::Module::Ptr module_sslMeterPro;
 	Vst::HostApplication context;
 
-
-
+	RtMidiIn midiIn;
+	RtMidiOut midiOut;
 
 };
 

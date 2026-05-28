@@ -38,7 +38,11 @@ struct FChannelStripWwiseParameters
 class AudioChannel : public Vst::IComponentHandler
 {
 public:
-	string ChannelName;
+	string ChannelName = "Track";
+	float FaderValue = -96.6;
+	int ChannelNumber = -1;
+
+
 	void SetModules(
 		Module::Ptr inChannelStripModule,
 		Module::Ptr inDynamicsModule,

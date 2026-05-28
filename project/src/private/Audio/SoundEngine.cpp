@@ -12,6 +12,7 @@
 #include "pluginterfaces/vst/ivsthostapplication.h"
 #include "pluginterfaces/vst/vsttypes.h"
 
+
 SoundEngine SoundEngine::gSoundEngine;
 
 bool SoundEngine::LoadSoundEngineConfiguration( EMixingDeskOperatingMode OperatingMode )
@@ -276,7 +277,7 @@ bool SoundEngine::InitializeSignalChain()
 	{
 		AudioChannel* newChannel = new AudioChannel();
 		newChannel->ChannelName = "Track " + indexChannels;
-		printf( "Initializing Channel % i : % s", indexChannels, newChannel->ChannelName );
+		printf( "Initializing Channel %i : %s", indexChannels, newChannel->ChannelName.c_str() );
 		switch ( SelectedChannelStripModel )
 		{
 			case EChannelStripModel::NATIVE:
@@ -302,6 +303,9 @@ bool SoundEngine::InitializeSignalChain()
 	}
 
 	signalChainInitialized = true;
+#if DEBUG_CONFIG
+	printf( "Finished initializing Signal Chain\n" );
+#endif
 	return signalChainInitialized;
 }
 
