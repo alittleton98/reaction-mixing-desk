@@ -11,8 +11,12 @@ else()
   message(FATAL_ERROR "Environment variable WWISEVERSION is required")
 endif()
 
-if (NOT DEFINED ENV{REAPERPLUGINPATH})
-	message(FATAL_ERROR "Environment variable REAPERPLUGINPATH not defined")
+if (NOT DEFINED ENV{CONTROLSURFACE_MIDI_IN})
+	message(FATAL_ERROR "Environment variable CONTROLSURFACE_MIDI_IN not defined")
+endif()
+
+if (NOT DEFINED ENV{CONTROLSURFACE_MIDI_OUT})
+	message(FATAL_ERROR "Environment variable CONTROLSURFACE_MIDI_OUT not defined")
 endif()
 
 if (NOT DEFINED ENV{VASIO_512_DRIVER})
@@ -117,7 +121,7 @@ ${WWISE_INTEGRATION_SOURCES}
 ${WWISE_PLATFORM_SOURCES}
 )		
 
-
+#target_compile_features(ReactionMixingDesk PRIVATE cxx_std_20)
 
 target_include_directories(ReactionMixingDesk PUBLIC "${WWISE_SDK_PATH}/include" 
 "${WWISE_SDK_PATH}/samples" "src/public" "include/vst3sdk" "include/asiosdk/common" "include/asiosdk/host" "include")
@@ -174,6 +178,8 @@ target_compile_definitions( ReactionMixingDesk PRIVATE
     VST_SSL_4000G_CHANNELSTRIP="${VST_SSL_4000G_CHANNELSTRIP}"
     VST_SSL_NATIVE_BUSCOMPRESSOR="${VST_SSL_NATIVE_BUSCOMPRESSOR}"
     VST_SSL_METER="${VST_SSL_METER}"
+	CONTROL_SURFACE_MIDI_IN="$ENV{CONTROLSURFACE_MIDI_IN}"
+	CONTROL_SURFACE_MIDI_OUT="$ENV{CONTROLSURFACE_MIDI_OUT}"
 )
 target_link_libraries(ReactionMixingDesk  PRIVATE "${CMAKE_SOURCE_DIR}/lib/rtmidi/rtmidi.lib")
 # Link Libararies

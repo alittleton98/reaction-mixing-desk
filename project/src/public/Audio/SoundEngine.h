@@ -33,29 +33,28 @@
 #include "rtmidi/RtMidi.h"
 #include "Control Surface/ControlSurface.h"
 
-
-
 void OnSampleRateChange( ASIOSampleRate SampleRate );
 ASIOTime* OnBufferSwitchTimeInfo( ASIOTime* Parameters, long DoubleBufferIndex, ASIOBool DirectProcess );
 long OnAsioMessage( long Selector, long Value, void* Message, double* opt );
+
 
 #define MAX_INPUT_CHANNELS 512
 #define MAX_OUTPUT_CHANNELS 512
 
 using namespace Steinberg;
-class AudioChannel;
+class AudioBus;
 
 //namespace Steinberg
 //{
 //	FUnknown* gStandardPluginContext = nullptr;
 //}
 
-class SoundEngine : public Vst::HostApplication
+class ReactionSoundEngine : public Vst::HostApplication
 {
 
 public:
-	static SoundEngine gSoundEngine;
-	static SoundEngine* GetSoundEngine() { return &SoundEngine::gSoundEngine; }
+	static ReactionSoundEngine gSoundEngine;
+	static ReactionSoundEngine* GetSoundEngine() { return &ReactionSoundEngine::gSoundEngine; }
 
 	ASIOCallbacks Callbacks;
 public:
@@ -65,21 +64,14 @@ public:
 
 	bool InitializeASIODevice();
 	bool InitializeSignalChain();
-	bool InitializeControlSurface();
 	bool InitializeWwiseSoundEngine();
-	bool LinkToWwiseAuthoring();
 
 	bool TerminateWwiseSoundEngine();
 	bool TerminateWwiseComms();
 	bool TerminateSoundEngine();
-	bool TerminateControlSurface();
 	bool IsFullyInitialized() { return false; };
+	bool ShouldEngineTick() { return bShouldEngineTick; };
 	bool ReloadSoundEngine();
-
-	// Timing Threads
-	bool FreeClockThread();
-	bool AsioClockThread();
-	bool PluginMessageThread();
 
 	// ASIO Implementation
 	bool LoadAsioDriver( EAsioDevice ChosenAsioDevice );
@@ -92,6 +84,7 @@ public:
 
 	// Signal Chain
 	bool ProcessSignalChain();
+	bool SetBusScribbleStripName( int BusNumber, string Name );
 
 	// Wwise Sound Engine implementation
 	AKRESULT SetupListener();
@@ -112,6 +105,7 @@ public:
 
 	// Control Surface
 	void MidiCallback( double deltatime, std::vector<unsigned char>* message, void* userData );
+	void UpdateControlSurface();
 
 	// Memory
 
@@ -139,7 +133,7 @@ private:
 	EAsioDevice SelectedAsioDevice;
 	EChannelConfiguration SelectedChannelConfiguration;
 	EChannelStripModel SelectedChannelStripModel;
-	vector<AudioChannel*> AudioChannels;
+	vector<AudioBus*> AudioChannels;
 
 	// ASIO
 	ASIODriverInfo	DriverInfo;
@@ -196,8 +190,12 @@ private:
 	VST3::Hosting::Module::Ptr module_sslMeterPro;
 	Vst::HostApplication context;
 
+	// Midi
 	RtMidiIn midiIn;
 	RtMidiOut midiOut;
+
+	// Timekeeping
+	bool bShouldEngineTick = false;
 
 };
 

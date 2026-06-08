@@ -25,6 +25,7 @@ enum class EChannelConfiguration : unsigned short
 	QUAD = 4,
 	SURROUND = 6,
 	SURROUND_REAR = 8,
+	ATMOS = 12
 };
 
 enum class EChannelStripModel : unsigned short
@@ -33,6 +34,17 @@ enum class EChannelStripModel : unsigned short
 	FOUR_THOUSAND_E,
 	FOUR_THOUSAND_G
 };
+
+namespace ChannelStripColors
+{
+	const int64_t Default_Blue = 0xFF29A3CC;
+	const int64_t Default_Green = 0xFF29CC29;
+	const int64_t Default_Red = 0xFFCC2929;
+	const int64_t Default_Yellow = 0xFFCCC729;
+	const int64_t Default_Orange = 0xFFCC6D29;
+	const int64_t Default_Purple = 0xFF8E29CC;
+
+}
 
 enum EMixingDeskOperatingMode
 {
@@ -48,17 +60,6 @@ enum EMixingDeskOperatingMode
 	STEREO_NATIVE_256,			// Busses are loaded as Stereo, Native Channel Strip 2, Bus Compressor, and 56 Channel I/O with 8 Channel Master. Channels are represented in pairs except the Master 
 	STEREO_4000G_256,			// Busses are loaded as Stereo, Native Channel Strip 2, Bus Compressor, and 56 Channel I/O with 8 Channel Master. Channels are represented in pairs except the Master 
 	STEREO_4000E_256,			// Busses are loaded as Stereo, Native Channel Strip 2, Bus Compressor, and 56 Channel I/O with 8 Channel Master. Channels are represented in pairs except the Master 
-	WWISE_CONTROL_SURFACE,
-	WWISE_SOUNDENGINE_RECORD_EXTERNAL,
-	WWISE_SOUNDENGINE_RECORD_INTERNAL
-};
-
-enum ETimingMechanism
-{
-	ASIO_DEVICE,
-	FIXED_RATE,
-	FREE_CLOCK,
-	MAX
 };
 
 typedef unsigned int uint32;

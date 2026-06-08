@@ -6,7 +6,6 @@
 #include "Common.h"
 #include "Audio/Plugin.h"
 #include "Control Surface/ControlSurface.h"
-#include "SampleBuffer.h"
 
 #include "pluginterfaces/vst/ivstaudioprocessor.h"
 #include "pluginterfaces/vst/ivsteditcontroller.h"
@@ -31,23 +30,14 @@ struct FChannelStripEffect
 	ClassInfo classInfo;
 };
 
-struct FChannelStripWwiseParameters
-{
-	int busObjectID = AK_INVALID_UNIQUE_ID;
-	string busName = "";
-
-};
-
 class AudioBus : public Vst::IComponentHandler
 {
 public:
 	string Name = "Track";
 	float FaderValue = -96.6;
 	int Number = -1;
-	int ASIOChannelIndexBase = 0;
-	int BufferSize = 0;
-	int64 Color;
 	EChannelConfiguration BusConfig = EChannelConfiguration::MONO;
+
 
 	void SetModules(
 		Module::Ptr inChannelStripModule,
@@ -118,9 +108,5 @@ private:
 	Vst::ProcessData ChannelProcessData;
 	Vst::SampleRate ChannelSampleRate;
 	int ChannelBlockSize;
-	int wwiseObjectID = AK_INVALID_UNIQUE_ID;
-
-	AudioMemoryPage* memoryPage_ch1 = nullptr;
-	AudioMemoryPage* memoryPage_ch2 = nullptr;
 };
 

@@ -1,6 +1,8 @@
 // Setup communicating with the control surface and linking
 #pragma once
 #include "rtmidi/RtMidi.h"
+#include "Common.h"
+
 
 namespace ControlSurface
 {
@@ -21,6 +23,13 @@ namespace ControlSurface
 			const unsigned char SB_Channel_Meter = 0xD0;
 			const unsigned char SB_Fader_Position = 0xE0;
 			const unsigned char SB_PanPot_Rotation = 0xB0;
+		}
+
+		namespace SysExCommands
+		{
+			const unsigned char UpdateTimecodeDisplay = 0x10;
+			const unsigned char UpdateAssignmentDisplay = 0x11;
+			const unsigned char UpdateLCD = 0x12;
 		}
 
 		typedef struct FControlSurfaceMessage
@@ -103,317 +112,272 @@ namespace ControlSurface
 		}
 
 
-		void inline SetMasterChannelName( RtMidiOut* inMidiOutput, int inChannelNumber, string Name )
+	}
+
+	void inline ControlSurface_MidiCallback( double deltatime, std::vector<unsigned char>* message, void* userData )
+	{
+		size_t nBytes = message->size();
+#if DEBUG_CONFIG
+		std::cout << "MIDI message received (" << nBytes << " bytes): ";
+		for ( unsigned int i = 0; i < nBytes; i++ )
+		{
+			std::cout << "0x" << std::hex << (int)message->at( i ) << " ";
+		}
+		std::cout << std::dec << "\n";
+#endif
+	}
+
+	void inline SetTimecodeMilliseconds( RtMidiOut* inMidiOutput, int milliseconds )
+	{
+		Messaging::FControlSurfaceSysExMessage Timecode;
+		char buf[ 12 ];
+		int hour_place_2 = ( milliseconds / 36000000000LL ) % 10;
+		int hour_place_1 = ( milliseconds / 3600000000LL ) % 10;
+		int hour_place_0 = ( milliseconds / 360000000LL ) % 10;
+		int minute_place_1 = ( milliseconds / 600000LL ) % 10;
+		int minute_place_0 = ( milliseconds / 60000LL ) % 10;
+		int second_place_1 = ( milliseconds / 10000LL ) % 10;
+		int second_place_0 = ( milliseconds / 1000LL ) % 10;
+		int millisecond_place_2 = ( milliseconds / 100LL ) % 10;
+		int millisecond_place_1 = ( milliseconds / 10LL ) % 10;
+		int millisecond_place_0 = ( milliseconds ) % 10;
+		Timecode.SysExCommand = 0x10;
+		snprintf( buf, sizeof( buf ), "0%d%d%d%d%d%d%d%d%d%d",
+			hour_place_1,
+			hour_place_0,
+			minute_place_1,
+			minute_place_0,
+			second_place_1,
+			second_place_0,
+			millisecond_place_2,
+			millisecond_place_1,
+			millisecond_place_0
+		);
+		Timecode.SysExPayload = buf;
+		inMidiOutput->sendMessage( &Timecode.ToByteArray() );
+	}
+
+	void inline SetTextOnScribbleStrip( RtMidiOut* inMidiOutput, int inStartingIndex, int inRowNumber, string text )
+	{
+		Messaging::FControlSurfaceSysExMessage ScribbleText;
+		ScribbleText.SysExCommand = 0x12;
+		ScribbleText.SysExPayload = new char[ 8 ];
+
+		if ( inStartingIndex > 56 - text.length() )
+		{
+			inStartingIndex = 56 - text.length();
+		}
+
+		// Assemble full 56 char string
+		char rowText[ 56 ];
+		int indexCharacter = 0;
+		for ( indexCharacter = 0; indexCharacter < inStartingIndex; indexCharacter++ )
+		{
+			rowText[ indexCharacter ] = *"";
+		}
+		for ( indexCharacter = inStartingIndex; indexCharacter < text.length() + inStartingIndex; indexCharacter++ )
+		{
+			rowText[ indexCharacter ] = text.at( indexCharacter - inStartingIndex );
+		}
+		for ( indexCharacter = text.length() + inStartingIndex; indexCharacter < 56; indexCharacter++ )
+		{
+			rowText[ indexCharacter ] = *"";
+		}
+
+		for ( int i = 0; i < 8; i++ )
+		{
+			int offset = i * 7 + ( ( inRowNumber ) * 0x38 );
+
+			ScribbleText.SysExPayload[ 0 ] = (unsigned char)offset;
+			for ( int indexChar = 0; indexChar < 8; indexChar++ )
+			{
+				ScribbleText.SysExPayload[ indexChar + 1 ] = rowText[ offset + indexChar ];
+			}
+			inMidiOutput->sendMessage( &ScribbleText.ToByteArray() );
+
+		}
+
+		//inMidiOutput->sendMessage( &ScribbleText.ToByteArray() );
+	}
+
+	void inline ResetScribbleStrip( RtMidiOut* inMidiOutput )
+	{
+		if ( !inMidiOutput )
+			return;
+
+		// Set Channel name to value that is 7 characters exactly. Truncate where required
+		Messaging::FControlSurfaceSysExMessage EmptyName;
+		EmptyName.SysExCommand = Messaging::SysExCommands::UpdateLCD;
+
+		for ( int i = 0; i < 16; i++ )
+		{
+			int offset = i * 7;
+
+			// Pad or truncate name to exactly 7 chars
+			string padded = "";
+			while ( padded.size() < 7 )
+				padded += ' ';
+
+			EmptyName.SysExPayload = new char[ 8 ];
+			EmptyName.SysExPayload[ 0 ] = (unsigned char)offset;
+			for ( int indexChar = 0; indexChar < padded.size(); indexChar++ )
+			{
+				EmptyName.SysExPayload[ indexChar + 1 ] = padded.at( indexChar );
+			}
+			inMidiOutput->sendMessage( &EmptyName.ToByteArray() );
+
+		}
+	}
+
+	namespace ProgressBar
+	{
+
+	}
+
+
+
+	void inline SetEmptyProgressBar( RtMidiOut* inMidiOutput )
+	{
+	}
+
+	void inline IncrementProgressBar( RtMidiOut* inMidiOutput )
+	{
+	}
+
+	void inline StartProgressBar( RtMidiOut* inMidiOutput, int TotalOperations, string TaskName )
+	{
+		int steps = 56 / TotalOperations;
+
+	}
+
+
+
+	namespace ChannelStrips
+	{
+		void inline SetChannelName( RtMidiOut* inMidiOutput, int inChannelNumber, string Name )
 		{
 			// Set Channel name to value that is 7 characters exactly. Truncate where required
-			FControlSurfaceSysExMessage ChannelName;
-			ChannelName.SysExCommand = 0x12;
-			int offset = 0;
+			Messaging::FControlSurfaceSysExMessage BusName;
+			BusName.SysExCommand = 0x12;
+			int offset = inChannelNumber * 7;
 
 			// Pad or truncate name to exactly 7 chars
 			string padded = Name.substr( 0, 7 );
 			while ( padded.size() < 7 )
 				padded += ' ';
 
-
-			ChannelName.SysExPayload = new char[ 8 ];
-			ChannelName.SysExPayload[ 0 ] = (unsigned char)offset;
+			BusName.SysExPayload = new char[ 8 ];
+			BusName.SysExPayload[ 0 ] = (unsigned char)offset;
 			for ( int indexChar = 0; indexChar < padded.size(); indexChar++ )
 			{
-				ChannelName.SysExPayload[ indexChar + 1 ] = padded.at( indexChar );
+				BusName.SysExPayload[ indexChar + 1 ] = padded.at( indexChar );
 			}
 
-			inMidiOutput->sendMessage( &ChannelName.ToByteArray() );
+			inMidiOutput->sendMessage( &BusName.ToByteArray() );
 
 		}
 
-
-		void inline SetTimecodeMilliseconds( RtMidiOut* inMidiOutput, int milliseconds )
+		void inline SetChannelDecibel( RtMidiOut* inMidiOutput, int inChannelNumber, float decibelValue )
 		{
-			FControlSurfaceSysExMessage Timecode;
-			char buf[ 12 ];
-			int hour_place_2 = ( milliseconds / 36000000000LL ) % 10;
-			int hour_place_1 = ( milliseconds / 3600000000LL ) % 10;
-			int hour_place_0 = ( milliseconds / 360000000LL ) % 10;
-			int minute_place_1 = ( milliseconds / 600000LL ) % 10;
-			int minute_place_0 = ( milliseconds / 60000LL ) % 10;
-			int second_place_1 = ( milliseconds / 10000LL ) % 10;
-			int second_place_0 = ( milliseconds / 1000LL ) % 10;
-			int millisecond_place_2 = ( milliseconds / 100LL ) % 10;
-			int millisecond_place_1 = ( milliseconds / 10LL ) % 10;
-			int millisecond_place_0 = ( milliseconds / 1 ) % 10;
-			Timecode.SysExCommand = 0x10;
-			snprintf( buf, sizeof( buf ), "00%d%d%d%d%d%d%d%d%d%d",
-				hour_place_2,
-				hour_place_1,
-				hour_place_0,
-				minute_place_1,
-				minute_place_0,
-				second_place_1,
-				second_place_0,
-				millisecond_place_2,
-				millisecond_place_1
+			// Set Channel name to value that is 7 characters exactly. Truncate where required
+			Messaging::FControlSurfaceSysExMessage Name;
+			Name.SysExCommand = 0x12;
+			int offset = inChannelNumber * 7 + 0x38;
+
+			// Pad or truncate name to exactly 7 chars
+			char buf[ 8 ];
+			buf[ 0 ] = (unsigned char)offset;
+			snprintf( buf + 1, sizeof( buf ) - 1, "%2.1f ",
+				decibelValue
 			);
-			Timecode.SysExPayload = buf;
-			inMidiOutput->sendMessage( &Timecode.ToByteArray() );
+
+			Name.SysExPayload = buf;
+
+			inMidiOutput->sendMessage( &Name.ToByteArray() );
 		}
 
-
-
-		namespace SSL
+		namespace ChannelValues
 		{
-			void inline ResetScribbleStrip( RtMidiOut* inMidiOutput )
-			{
-				// Set Channel name to value that is 7 characters exactly. Truncate where required
-				FControlSurfaceSysExMessage ChannelName;
-				ChannelName.SysExCommand = 0x12;
-
-				for ( int i = 0; i < 16; i++ )
-				{
-					int offset = i * 7;
-
-					// Pad or truncate name to exactly 7 chars
-					string padded = "";
-					while ( padded.size() < 7 )
-						padded += ' ';
-
-					ChannelName.SysExPayload = new char[ 8 ];
-					ChannelName.SysExPayload[ 0 ] = (unsigned char)offset;
-					for ( int indexChar = 0; indexChar < padded.size(); indexChar++ )
-					{
-						ChannelName.SysExPayload[ indexChar + 1 ] = padded.at( indexChar );
-					}
-				}
-
-				inMidiOutput->sendMessage( &ChannelName.ToByteArray() );
-			}
-
-			namespace ChannelStrips
-			{
-				void inline SetChannelName( RtMidiOut* inMidiOutput, int inChannelNumber, string Name )
-				{
-					// Set Channel name to value that is 7 characters exactly. Truncate where required
-					FControlSurfaceSysExMessage ChannelName;
-					ChannelName.SysExCommand = 0x12;
-					int offset = inChannelNumber * 7;
-
-					// Pad or truncate name to exactly 7 chars
-					string padded = Name.substr( 0, 7 );
-					while ( padded.size() < 7 )
-						padded += ' ';
-
-					ChannelName.SysExPayload = new char[ 8 ];
-					ChannelName.SysExPayload[ 0 ] = (unsigned char)offset;
-					for ( int indexChar = 0; indexChar < padded.size(); indexChar++ )
-					{
-						ChannelName.SysExPayload[ indexChar + 1 ] = padded.at( indexChar );
-					}
-
-					inMidiOutput->sendMessage( &ChannelName.ToByteArray() );
-
-				}
-
-				void inline SetChannelDecibel( RtMidiOut* inMidiOutput, int inChannelNumber, float decibelValue )
-				{
-					// Set Channel name to value that is 7 characters exactly. Truncate where required
-					FControlSurfaceSysExMessage ChannelName;
-					ChannelName.SysExCommand = 0x12;
-					int offset = inChannelNumber * 7 + 0x38;
-
-					// Pad or truncate name to exactly 7 chars
-					char buf[ 8 ];
-					buf[ 0 ] = (unsigned char)offset;
-					snprintf( buf + 1, sizeof( buf ) - 1, "%2.1f ",
-						decibelValue
-					);
-
-					ChannelName.SysExPayload = buf;
-
-					inMidiOutput->sendMessage( &ChannelName.ToByteArray() );
-				}
-
-				namespace ChannelValues
-				{
-					const unsigned char Channel_01 = 0x00;
-					const unsigned char Channel_02 = 0x01;
-					const unsigned char Channel_03 = 0x02;
-					const unsigned char Channel_04 = 0x03;
-					const unsigned char Channel_05 = 0x04;
-					const unsigned char Channel_06 = 0x05;
-					const unsigned char Channel_07 = 0x06;
-					const unsigned char Channel_08 = 0x07;
-				}
-
-				namespace Faders
-				{
-					// Fader Count
-					const unsigned char Fader = 0xE0;
-
-					struct FaderPosition : ControlSurfaceMessage
-					{
-						unsigned char msb = 0x00;
-						unsigned char lsb = 0x00;
-						FaderPosition() : ControlSurfaceMessage( 0xE0, lsb, msb ) {} // Default constructor initializes to fader 1 at maximum throw position
-						FaderPosition( unsigned char Status_SelectedFader ) : ControlSurfaceMessage( Status_SelectedFader, lsb, msb ) {}
-					};
-
-					// Lowest position of the fader, which is negative infinity generally
-					struct FaderPosition_NegativeInf : ControlSurfaceMessage
-					{
-						FaderPosition_NegativeInf() : ControlSurfaceMessage( 0xE0, 0x00, 0x00 ) {} // Default constructor initializes to fader 1 at negative infinity position
-						FaderPosition_NegativeInf( int Status_SelectedFader ) : ControlSurfaceMessage( 0xE0 | Status_SelectedFader, 0x00, 0x00 ) {}
-					};
-
-					// Maximum position of the fader, which is generally +10 or +12 dB
-					struct FaderPosition_MaxThrow : ControlSurfaceMessage
-					{
-						FaderPosition_MaxThrow() : ControlSurfaceMessage( 0xE0, 0x7F, 0x7F ) {} // Default constructor initializes to fader 1 at maximum throw position
-						FaderPosition_MaxThrow( int Status_SelectedFader ) : ControlSurfaceMessage( 0xE0 | Status_SelectedFader, 0x7F, 0x7F ) {}
-					};
-
-					struct FaderPosition_Unity : ControlSurfaceMessage
-					{
-						FaderPosition_Unity() : ControlSurfaceMessage( 0xE0, 0x5B, 0x5B ) {} // Default constructor initializes to fader 1 at maximum throw position
-						FaderPosition_Unity( int Status_SelectedFader ) : ControlSurfaceMessage( 0xE0 | Status_SelectedFader, 0x5B, 0x5B ) {}
-					};
-
-					void inline SetFaderPosition( RtMidiOut* inMidiOutput, int inChannelNumber, uint16_t inPosition )
-					{
-						FControlSurfaceMessage faderPosition;
-						faderPosition.StatusByte = StatusBytes::SB_Fader_Position | inChannelNumber;
-						faderPosition.DataByte1 = inPosition & 0x7F;
-						faderPosition.DataByte2 = ( inPosition >> 7 ) & 0x7F;
-
-						inMidiOutput->sendMessage( &faderPosition.ToByteArray() );
-					}
-				}
-
-				namespace PanPots
-				{
-
-					const unsigned char PanPot_Direction_Clockwise = 0x01;
-					const unsigned char PanPot_Direction_CounterClockwise = 0x41;
-					const unsigned char PanPot = 0x10;
-					const unsigned char PanPot_Button = 0x20;
-				}
-
-				namespace Buttons
-				{
-					const unsigned char Buttons_Rec = 0x00;
-					const unsigned char Buttons_Solo = 0x08;
-					const unsigned char Buttons_Cut = 0x10;
-					const unsigned char Buttons_Select = 0x18;
-				}
-
-				namespace Display
-				{
-					const unsigned char Display_Meter_NegInfinity = 0x00;
-					const unsigned char Display_Meter_Unity = 0x0C;
-					const unsigned char Display_Meter_Clip = 0x0E;
-					const unsigned char Display_Meter_ClearClip = 0x0F;
-				}
-
-				namespace Effects
-				{
-
-					typedef struct FEffectParameter
-					{
-						uint32 ParameterID = 0;;
-						double ParameterValue = 0.f;
-
-					public:
-						FEffectParameter( uint32 id ) : ParameterID( id ) {};
-					};
-
-					const double Param_Min = 0.f;
-					const double Param_Max = 1.f;
-
-					namespace NCS2
-					{
-						inline FEffectParameter Gain_Input( 1563454188 );
-						inline FEffectParameter Gain_Output( 867502030 );
-						inline FEffectParameter ChannelActive( 2004703496 );
-
-						namespace Filters
-						{
-							inline FEffectParameter LowPassFilter( 1473943933 );
-							inline FEffectParameter HighPassFilter( 225137163 );
-						}
-						namespace Eq
-						{
-							inline FEffectParameter Enabled( 2166545 );
-							inline FEffectParameter E_Model_Enabled( 69881 );
-
-							inline FEffectParameter HighShelf_Gain( 1240660653 );
-							inline FEffectParameter HighShelf_Freq( 1240647078 );
-							inline FEffectParameter HighShelf_Bell( 1240515633 );
-
-							inline FEffectParameter HighMidBand_Gain( 1015610129 );
-							inline FEffectParameter HighMidBand_Freq( 1015596554 );
-							inline FEffectParameter HighMidBand_Q( 1463142943 );
-
-							inline FEffectParameter LowMidBand_Gain( 1073914335 );
-							inline FEffectParameter LowMidBand_Freq( 1073900760 );
-							inline FEffectParameter LowMidBand_Q( 794052113 );
-
-							inline FEffectParameter LowShelf_Gain( 571569823 );
-							inline FEffectParameter LowShelf_Freq( 571556248 );
-							inline FEffectParameter LowShelf_Bell( 571424803 );
-						}
-						namespace Dynamics
-						{
-
-							inline FEffectParameter Compressor_FastAttack_Enabled( 76418643 );
-							inline FEffectParameter Compressor_Peak_Enabled( 1611847854 );
-							inline FEffectParameter Compressor_Enabled( 1708054649 );
-							inline FEffectParameter Compressor_Ratio( 576905756 );
-							inline FEffectParameter Compressor_Threshold( 589759996 );
-							inline FEffectParameter Compressor_Release( 462649816 );
-
-							inline FEffectParameter Expander_Enabled( 1299822290 );
-							inline FEffectParameter Expander_FastAttack_Enabled( 1357033743 );
-							inline FEffectParameter Expander_Range( 615146258 );
-							inline FEffectParameter Expander_Threshold( 76880832 );
-							inline FEffectParameter Expander_Release( 710160540 );
-							inline FEffectParameter Expander_Hold( 643021898 );
-						}
-					}
-
-					namespace FourKE
-					{
-						namespace Filters
-						{
-							inline FEffectParameter Gain_Input( 1563454188 );
-							inline FEffectParameter Gain_Output( 867502030 );
-
-						}
-						namespace Eq
-						{
-						}
-						namespace Dynamics
-						{
-						}
-					}
-
-					namespace FourKG
-					{
-						namespace Filters
-						{
-							inline FEffectParameter UC1_Gain_Input( 1563454188 );
-							inline FEffectParameter UC1_Gain_Output( 867502030 );
-
-						}
-						namespace Eq
-						{
-						}
-						namespace Dynamics
-						{
-						}
-					}
-				}
-			}
-
+			const unsigned char Channel_01 = 0x00;
+			const unsigned char Channel_02 = 0x01;
+			const unsigned char Channel_03 = 0x02;
+			const unsigned char Channel_04 = 0x03;
+			const unsigned char Channel_05 = 0x04;
+			const unsigned char Channel_06 = 0x05;
+			const unsigned char Channel_07 = 0x06;
+			const unsigned char Channel_08 = 0x07;
 		}
 
+		namespace Faders
+		{
+			// Fader Count
+			const unsigned char Fader = 0xE0;
+
+			struct FaderPosition : Messaging::ControlSurfaceMessage
+			{
+				unsigned char msb = 0x00;
+				unsigned char lsb = 0x00;
+				FaderPosition() : Messaging::ControlSurfaceMessage( 0xE0, lsb, msb ) {} // Default constructor initializes to fader 1 at maximum throw position
+				FaderPosition( unsigned char Status_SelectedFader ) : Messaging::ControlSurfaceMessage( Status_SelectedFader, lsb, msb ) {}
+			};
+
+			// Lowest position of the fader, which is negative infinity generally
+			struct FaderPosition_NegativeInf : Messaging::ControlSurfaceMessage
+			{
+				FaderPosition_NegativeInf() : Messaging::ControlSurfaceMessage( 0xE0, 0x00, 0x00 ) {} // Default constructor initializes to fader 1 at negative infinity position
+				FaderPosition_NegativeInf( int Status_SelectedFader ) : Messaging::ControlSurfaceMessage( 0xE0 | Status_SelectedFader, 0x00, 0x00 ) {}
+			};
+
+			// Maximum position of the fader, which is generally +10 or +12 dB
+			struct FaderPosition_MaxThrow : Messaging::ControlSurfaceMessage
+			{
+				FaderPosition_MaxThrow() : Messaging::ControlSurfaceMessage( 0xE0, 0x7F, 0x7F ) {} // Default constructor initializes to fader 1 at maximum throw position
+				FaderPosition_MaxThrow( int Status_SelectedFader ) : Messaging::ControlSurfaceMessage( 0xE0 | Status_SelectedFader, 0x7F, 0x7F ) {}
+			};
+
+			struct FaderPosition_Unity : Messaging::ControlSurfaceMessage
+			{
+				FaderPosition_Unity() : Messaging::ControlSurfaceMessage( 0xE0, 0x5B, 0x5B ) {} // Default constructor initializes to fader 1 at maximum throw position
+				FaderPosition_Unity( int Status_SelectedFader ) : Messaging::ControlSurfaceMessage( 0xE0 | Status_SelectedFader, 0x5B, 0x5B ) {}
+			};
+
+			void inline SetFaderPosition( RtMidiOut* inMidiOutput, int inChannelNumber, uint16_t inPosition )
+			{
+				Messaging::FControlSurfaceMessage faderPosition;
+				faderPosition.StatusByte = Messaging::StatusBytes::SB_Fader_Position | inChannelNumber;
+				faderPosition.DataByte1 = inPosition & 0x7F;
+				faderPosition.DataByte2 = ( inPosition >> 7 ) & 0x7F;
+
+				inMidiOutput->sendMessage( &faderPosition.ToByteArray() );
+			}
+		}
+
+		namespace PanPots
+		{
+
+			const unsigned char PanPot_Direction_Clockwise = 0x01;
+			const unsigned char PanPot_Direction_CounterClockwise = 0x41;
+			const unsigned char PanPot = 0x10;
+			const unsigned char PanPot_Button = 0x20;
+		}
+
+		namespace Buttons
+		{
+			const unsigned char Buttons_Rec = 0x00;
+			const unsigned char Buttons_Solo = 0x08;
+			const unsigned char Buttons_Cut = 0x10;
+			const unsigned char Buttons_Select = 0x18;
+		}
+
+		namespace Display
+		{
+			const unsigned char Display_Meter_NegInfinity = 0x00;
+			const unsigned char Display_Meter_Unity = 0x0C;
+			const unsigned char Display_Meter_Clip = 0x0E;
+			const unsigned char Display_Meter_ClearClip = 0x0F;
+		}
 	}
+
+
+
 }

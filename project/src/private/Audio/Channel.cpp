@@ -9,31 +9,35 @@
 #include "pluginterfaces/vst/vstspeaker.h"
 #include "pluginterfaces/vst/ivstmessage.h"
 
-void AudioChannel::SetModules( VST3::Hosting::Module::Ptr inChannelStripModule, VST3::Hosting::Module::Ptr inDynamicsModule, VST3::Hosting::Module::Ptr inMeterModule
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
+
+void AudioBus::SetModules( VST3::Hosting::Module::Ptr inChannelStripModule, VST3::Hosting::Module::Ptr inDynamicsModule, VST3::Hosting::Module::Ptr inMeterModule
 )
 {
 #if DEBUG_CONFIG
-	printf( "Setting up modules for Channel %s\n", ChannelName );
+	printf( "Setting up modules for Channel %s\n", Name.c_str() );
 #endif
 
 	if ( !inChannelStripModule )
 	{
 #if DEBUG_CONFIG
-		assert( "AudioChannel::SetModules | ChannelStrip module is nullptr\n" );
+		assert( "AudioBus::SetModules | ChannelStrip module is nullptr\n" );
 		return;
 #endif
 	}
 	if ( !inDynamicsModule )
 	{
 #if DEBUG_CONFIG
-		assert( "AudioChannel::SetModules | Dynamics module is nullptr\n" );
+		assert( "AudioBus::SetModules | Dynamics module is nullptr\n" );
 		return;
 #endif
 	}
 	if ( !inMeterModule )
 	{
 #if DEBUG_CONFIG
-		assert( "AudioChannel::SetModules | Meter module is nullptr\n" );
+		assert( "AudioBus::SetModules | Meter module is nullptr\n" );
 		return;
 #endif
 	}
@@ -44,10 +48,10 @@ void AudioChannel::SetModules( VST3::Hosting::Module::Ptr inChannelStripModule, 
 }
 
 
-bool AudioChannel::InitializeChannel( SoundEngine* inSoundEngine, EChannelConfiguration inChannelConfig, bool bUseBusCompressor, bool bUseMeter )
+bool AudioBus::InitializeBus( ReactionSoundEngine* inSoundEngine, EChannelConfiguration inChannelConfig, bool bUseBusCompressor, bool bUseMeter )
 {
 #if DEBUG_CONFIG
-	printf( "Initializing Channel %s\n", ChannelName );
+	//printf( "Initializing Bus %s\n", Name.c_str() );
 #endif
 	auto channelStripFactory = channelStripModule->getFactory();
 	auto dynamicsFactory = dynamicsModule->getFactory();
@@ -56,50 +60,90 @@ bool AudioChannel::InitializeChannel( SoundEngine* inSoundEngine, EChannelConfig
 	dynamicsFactory.setHostContext( inSoundEngine );
 	meterFactory.setHostContext( inSoundEngine );
 
+	// Initialize plugins for each channel
+	int numChannelsPerBus = 0;
+	SIZE_T totalRingBufferSize = GetRingBufferSize( inSoundEngine->GetAsioBufferSize() );
+	switch ( inChannelConfig )
+	{
+		case EChannelConfiguration::MONO:
+			numChannelsPerBus = (int)EChannelConfiguration::MONO;
+			// Channel 1 memory
+			memoryPage_ch1 = new AudioMemoryPage();
+			memoryPage_ch1->header = new AudioSampleBufferHeader();
+			memoryPage_ch1->mappingName = memoryPage_ch1->mappingName + to_string( ASIOChannelIndexBase ).c_str();
+			memoryPage_ch1->memoryFile = CreateFileMappingA( INVALID_HANDLE_VALUE, nullptr, PAGE_READONLY, static_cast<DWORD>( totalRingBufferSize >> 32 ), static_cast<DWORD>( totalRingBufferSize & 0xFFFFFFFF ), memoryPage_ch1->mappingName.c_str() );
+
+			memoryPage_ch1->header->channelIndex = ASIOChannelIndexBase;
+			memoryPage_ch1->header->frameCapacity = inSoundEngine->GetAsioBufferSize();
+			memoryPage_ch1->header->sampleRate = inSoundEngine->GetAsioSampleRate();
+			memoryPage_ch1->header->writePointer.store( 0, memory_order_relaxed );
+			memoryPage_ch1->header->readPointer.store( 0, memory_order_relaxed );
+			break;
+		case EChannelConfiguration::STEREO:
+			numChannelsPerBus = (int)EChannelConfiguration::STEREO;
+			// Channel 1 memory
+			memoryPage_ch1 = new AudioMemoryPage();
+			memoryPage_ch1->header = new AudioSampleBufferHeader();
+			memoryPage_ch1->mappingName = memoryPage_ch1->mappingName + to_string( ASIOChannelIndexBase ).c_str();
+			memoryPage_ch1->memoryFile = CreateFileMappingA( INVALID_HANDLE_VALUE, nullptr, PAGE_READONLY, static_cast<DWORD>( totalRingBufferSize >> 32 ), static_cast<DWORD>( totalRingBufferSize & 0xFFFFFFFF ), memoryPage_ch1->mappingName.c_str() );
+
+			memoryPage_ch1->header->channelIndex = ASIOChannelIndexBase;
+			memoryPage_ch1->header->frameCapacity = inSoundEngine->GetAsioBufferSize();
+			memoryPage_ch1->header->sampleRate = inSoundEngine->GetAsioSampleRate();
+			memoryPage_ch1->header->writePointer.store( 0, memory_order_relaxed );
+			memoryPage_ch1->header->readPointer.store( 0, memory_order_relaxed );
+
+			// Channel 2 memory
+			memoryPage_ch2 = new AudioMemoryPage();
+			memoryPage_ch2->mappingName = memoryPage_ch2->mappingName + to_string( ASIOChannelIndexBase + 1 ).c_str();
+			memoryPage_ch2->memoryFile = CreateFileMappingA( INVALID_HANDLE_VALUE, nullptr, PAGE_READONLY, static_cast<DWORD>( totalRingBufferSize >> 32 ), static_cast<DWORD>( totalRingBufferSize & 0xFFFFFFFF ), memoryPage_ch2->mappingName.c_str() );
+			break;
+		default:
+			numChannelsPerBus = (int)EChannelConfiguration::MONO;
+			// Channel 1 memory
+			memoryPage_ch1 = new AudioMemoryPage();
+			memoryPage_ch1->mappingName = memoryPage_ch1->mappingName + to_string( ASIOChannelIndexBase ).c_str();
+			memoryPage_ch1->memoryFile = CreateFileMappingA( INVALID_HANDLE_VALUE, nullptr, PAGE_READONLY, static_cast<DWORD>( totalRingBufferSize >> 32 ), static_cast<DWORD>( totalRingBufferSize & 0xFFFFFFFF ), memoryPage_ch1->mappingName.c_str() );
+
+			memoryPage_ch1->header->channelIndex = ASIOChannelIndexBase;
+			memoryPage_ch1->header->frameCapacity = inSoundEngine->GetAsioBufferSize();
+			memoryPage_ch1->header->sampleRate = inSoundEngine->GetAsioSampleRate();
+			memoryPage_ch1->header->writePointer.store( 0, memory_order_relaxed );
+			memoryPage_ch1->header->readPointer.store( 0, memory_order_relaxed );
+			break;
+	}
+
 	if ( !StartChannelStrip( channelStripFactory, inSoundEngine, inChannelConfig ) )
 	{
 #if DEBUG_CONFIG
-		assert( "Failed to initialize Channel Strip %s", newChannel->ChannelName );
+		assert( "Failed to initialize Channel Strip for Bus %s at Channel number %i", newChannel->Name.c_str(), indexTotalChannels );
 #endif
 		return false;
 	}
-
-	if ( bUseBusCompressor )
-	{
-		if ( !StartDynamics( dynamicsFactory, inSoundEngine, inChannelConfig ) )
-		{
-#if DEBUG_CONFIG
-			assert( "Failed to initialize Dynamics %s", newChannel->ChannelName );
-#endif
-			return false;
-		}
-	}
-
 
 	if ( bUseMeter )
 	{
 		if ( !StartMeter( meterFactory, inSoundEngine, inChannelConfig ) )
 		{
 #if DEBUG_CONFIG
-			assert( "Failed to initialize Meter %s", newChannel->ChannelName );
+			assert( "Failed to initialize Meter for Bus %s at Channel number %i", newChannel->Name.c_str(), indexTotalChannels );
 #endif
 			return false;
 		}
 	}
 
-
 	return true;
 }
 
-bool AudioChannel::ProcessAudioForChannel()
+bool AudioBus::ProcessAudioForChannel()
 {
 	return true;
 }
 
-bool AudioChannel::StartChannelStrip( PluginFactory inChannelStripFactory, SoundEngine* inSoundEngine, EChannelConfiguration inChannelConfig )
+bool AudioBus::StartChannelStrip( PluginFactory inChannelStripFactory, ReactionSoundEngine* inSoundEngine, EChannelConfiguration inChannelConfig )
 {
 #if DEBUG_CONFIG
-	printf( "Starting Channel Strip for Channel %s\n", ChannelName.c_str() );
+	//printf( "Starting Channel Strip for Channel %s\n", Name.c_str() );
 #endif
 	for ( int indexClassInfos = 0; indexClassInfos < inChannelStripFactory.classCount(); indexClassInfos++ )
 	{
@@ -113,7 +157,7 @@ bool AudioChannel::StartChannelStrip( PluginFactory inChannelStripFactory, Sound
 	if ( !ChannelStripEffect.pluginProvider )
 	{
 #if DEBUG_CONFIG
-		assert( "AudioChannel::StartChannelStrip | Meter module is nullptr\n" );
+		assert( "AudioBus::StartChannelStrip | Meter module is nullptr\n" );
 		return false;
 #endif
 	}
@@ -122,7 +166,7 @@ bool AudioChannel::StartChannelStrip( PluginFactory inChannelStripFactory, Sound
 		if ( !ChannelStripEffect.pluginProvider->initialize() )
 		{
 #if DEBUG_CONFIG
-			assert( "AudioChannel::StartChannelStrip | plugin provider failed to initialize\n" );
+			assert( "AudioBus::StartChannelStrip | plugin provider failed to initialize\n" );
 			return false;
 #endif
 		}
@@ -132,7 +176,7 @@ bool AudioChannel::StartChannelStrip( PluginFactory inChannelStripFactory, Sound
 	if ( !ChannelStripEffect.componentPtr )
 	{
 #if DEBUG_CONFIG
-		assert( "AudioChannel::StartChannelStrip | Channel Strip component is nullptr\n" );
+		assert( "AudioBus::StartChannelStrip | Channel Strip component is nullptr\n" );
 		return false;
 #endif
 	}
@@ -141,7 +185,7 @@ bool AudioChannel::StartChannelStrip( PluginFactory inChannelStripFactory, Sound
 	if ( !ChannelStripEffect.editControllerPtr )
 	{
 #if DEBUG_CONFIG
-		assert( "AudioChannel::StartChannelStrip | Channel Strip edit controller is nullptr\n" );
+		assert( "AudioBus::StartChannelStrip | Channel Strip edit controller is nullptr\n" );
 		return false;
 #endif
 	}
@@ -150,7 +194,7 @@ bool AudioChannel::StartChannelStrip( PluginFactory inChannelStripFactory, Sound
 	if ( !ChannelStripEffect.audioProcessorPtr )
 	{
 #if DEBUG_CONFIG
-		assert( "AudioChannel::StartChannelStrip | Channel Strip audio processor is nullptr\n" );
+		assert( "AudioBus::StartChannelStrip | Channel Strip audio processor is nullptr\n" );
 		return false;
 #endif
 	}
@@ -195,7 +239,8 @@ bool AudioChannel::StartChannelStrip( PluginFactory inChannelStripFactory, Sound
 		if ( attrList )
 		{
 			// Channel name — STR16 produces a const TChar* (UTF-16)
-			const Vst::TChar* channelName = STR16( "Test Channel" );
+			Vst::TChar channelName[ 128 ];
+			for ( int i = 0; i < 128; i++ ) { channelName[ i ] = static_cast<Vst::TChar>( Name[ i ] ); if ( !Name[ i ] ) break; }
 
 			// Compute character count manually (no wcslen dependency)
 			int64 nameLen = 0;
@@ -205,8 +250,8 @@ bool AudioChannel::StartChannelStrip( PluginFactory inChannelStripFactory, Sound
 			attrList->setInt( Vst::ChannelContext::kChannelNameLengthKey, nameLen );
 
 			// Channel index (1-based) and color (ARGB)
-			attrList->setInt( Vst::ChannelContext::kChannelIndexKey, (int64)1 );
-			attrList->setInt( Vst::ChannelContext::kChannelColorKey, (int64)0xFF29A3CC );
+			attrList->setInt( Vst::ChannelContext::kChannelIndexKey, (int64)Number + 1 );
+			attrList->setInt( Vst::ChannelContext::kChannelColorKey, ChannelStripColors::Default_Green );
 
 			// Push to the plugin
 			infoListener->setChannelContextInfos( attrList );
@@ -222,7 +267,7 @@ bool AudioChannel::StartChannelStrip( PluginFactory inChannelStripFactory, Sound
 		if ( view )
 		{
 #if DEBUG_CONFIG
-			printf( "Creating Channel Strip window for Channel %s\n", ChannelName.c_str() );
+			//printf( "Creating Channel Strip window for Channel %s\n", Name.c_str() );
 #endif
 			// Create a native Win32 window to host it
 			HWND hwnd = CreateWindowExW(
@@ -245,146 +290,11 @@ bool AudioChannel::StartChannelStrip( PluginFactory inChannelStripFactory, Sound
 	return true;
 }
 
-bool AudioChannel::StartDynamics( PluginFactory inDynamicsFactory, SoundEngine* inSoundEngine, EChannelConfiguration inChannelConfig )
+
+bool AudioBus::StartMeter( PluginFactory inMeterFactory, ReactionSoundEngine* inSoundEngine, EChannelConfiguration inChannelConfig )
 {
 #if DEBUG_CONFIG
-	printf( "Starting Dynamics for Channel %s\n", ChannelName.c_str() );
-#endif
-
-	for ( int indexClassInfos = 0; indexClassInfos < inDynamicsFactory.classCount(); indexClassInfos++ )
-	{
-		if ( inDynamicsFactory.classInfos()[ indexClassInfos ].category() == kVstAudioEffectClass )
-		{
-			DynamicsEffect.classInfo = inDynamicsFactory.classInfos()[ indexClassInfos ];
-			break;
-		}
-	}
-	DynamicsEffect.pluginProvider = new Vst::PlugProvider( inDynamicsFactory, DynamicsEffect.classInfo, true );
-	if ( !DynamicsEffect.pluginProvider )
-	{
-#if DEBUG_CONFIG
-		assert( "AudioChannel::StartDynamics | plugin provider is nullptr\n" );
-		return false;
-#endif
-	}
-	else
-	{
-		if ( !DynamicsEffect.pluginProvider->initialize() )
-		{
-#if DEBUG_CONFIG
-			assert( "AudioChannel::StartDynamics | plugin provider failed to initialize\n" );
-			return false;
-#endif
-		}
-	}
-
-	DynamicsEffect.componentPtr = DynamicsEffect.pluginProvider->getComponent();
-	if ( !DynamicsEffect.componentPtr )
-	{
-#if DEBUG_CONFIG
-		assert( "AudioChannel::StartDynamics | Dynamics component is nullptr\n" );
-		return false;
-#endif
-	}
-
-	DynamicsEffect.editControllerPtr = DynamicsEffect.pluginProvider->getController();
-	if ( !DynamicsEffect.editControllerPtr )
-	{
-#if DEBUG_CONFIG
-		assert( "AudioChannel::StartDynamics | Dynamics edit controller is nullptr\n" );
-		return false;
-#endif
-	}
-
-	DynamicsEffect.componentPtr->queryInterface( Vst::IAudioProcessor::iid, (void**)&DynamicsEffect.audioProcessorPtr );
-	if ( !DynamicsEffect.audioProcessorPtr )
-	{
-#if DEBUG_CONFIG
-		assert( "AudioChannel::StartDynamics | Dynamics audio processor is nullptr\n" );
-		return false;
-#endif
-	}
-
-	DynamicsEffect.editControllerPtr->setComponentHandler( this );
-	Vst::IConnectionPoint* compCP = nullptr;
-	Vst::IConnectionPoint* ctrlCP = nullptr;
-	DynamicsEffect.componentPtr->queryInterface( Vst::IConnectionPoint::iid, (void**)&compCP );
-	DynamicsEffect.editControllerPtr->queryInterface( Vst::IConnectionPoint::iid, (void**)&ctrlCP );
-	if ( compCP && ctrlCP )
-	{
-		compCP->connect( ctrlCP );
-		ctrlCP->connect( compCP );
-	}
-	if ( compCP ) compCP->release();
-	if ( ctrlCP ) ctrlCP->release();
-
-	//for ( int indexParameter = 0; indexParameter < DynamicsEffect.editControllerPtr->getParameterCount(); indexParameter++ )
-	//{
-	//	Vst::ParameterInfo parameter;
-	//	if ( DynamicsEffect.editControllerPtr->getParameterInfo( indexParameter, parameter ) == kResultTrue )
-	//	{
-	//		std::wstring wstr_title( parameter.title, parameter.title + 128 );
-	//		wstr_title = wstr_title.substr( 0, wstr_title.find( L'\0' ) );
-
-	//		/*std::wcout << "Param ID: " << parameter.id
-	//			<< " |Name: " << wstr_title
-	//			<< " |Default: " << parameter.defaultNormalizedValue
-	//			<< std::endl;
-	//	}*/
-
-	//	}
-
-		//Vst::ChannelContext::IInfoListener* infoListener = nullptr;
-		//DynamicsEffect.componentPtr->queryInterface(
-		//	Vst::ChannelContext::IInfoListener::iid,
-		//	(void**)&infoListener
-		//);
-
-		//if ( !infoListener )
-		//{
-		//	printf( "[VST3] IInfoListener not supported\n" );
-		//	return false;
-		//}
-
-		//// Communicate attribute list
-
-		//infoListener->release();
-
-	IPlugView* view = nullptr;
-	if ( DynamicsEffect.editControllerPtr )
-	{
-		view = DynamicsEffect.editControllerPtr->createView( Vst::ViewType::kEditor );
-		if ( view )
-		{
-#if DEBUG_CONFIG
-			printf( "Creating Dynamics window for Channel %s\n", ChannelName.c_str() );
-#endif
-			// Create a native Win32 window to host it
-			HWND hwnd = CreateWindowExW(
-				0, L"STATIC", L"VST3 Host",
-				WS_DISABLED,
-				CW_USEDEFAULT, CW_USEDEFAULT,
-				800, 600,
-				nullptr, nullptr, GetModuleHandle( nullptr ), nullptr
-			);
-
-			if ( view->isPlatformTypeSupported( kPlatformTypeHWND ) == kResultOk )
-			{
-				view->attached( hwnd, kPlatformTypeHWND );
-			}
-
-			view->release();
-			//DestroyWindow( hwnd );
-		}
-	}
-
-	return true;
-}
-
-bool AudioChannel::StartMeter( PluginFactory inMeterFactory, SoundEngine* inSoundEngine, EChannelConfiguration inChannelConfig )
-{
-#if DEBUG_CONFIG
-	printf( "Starting Meter for Channel %s\n", ChannelName.c_str() );
+	printf( "Starting Meter for Channel %s\n", Name.c_str() );
 #endif
 
 	for ( int indexClassInfos = 0; indexClassInfos < inMeterFactory.classCount(); indexClassInfos++ )
@@ -399,7 +309,7 @@ bool AudioChannel::StartMeter( PluginFactory inMeterFactory, SoundEngine* inSoun
 	if ( !MeterEffect.pluginProvider )
 	{
 #if DEBUG_CONFIG
-		assert( "AudioChannel::StartMeter | plugin provider is nullptr\n" );
+		assert( "AudioBus::StartMeter | plugin provider is nullptr\n" );
 		return false;
 #endif
 	}
@@ -408,7 +318,7 @@ bool AudioChannel::StartMeter( PluginFactory inMeterFactory, SoundEngine* inSoun
 		if ( !MeterEffect.pluginProvider->initialize() )
 		{
 #if DEBUG_CONFIG
-			assert( "AudioChannel::StartMeter | plugin provider failed to initialize\n" );
+			assert( "AudioBus::StartMeter | plugin provider failed to initialize\n" );
 			return false;
 #endif
 		}
@@ -418,7 +328,7 @@ bool AudioChannel::StartMeter( PluginFactory inMeterFactory, SoundEngine* inSoun
 	if ( !MeterEffect.componentPtr )
 	{
 #if DEBUG_CONFIG
-		assert( "AudioChannel::StartMeter | Meter component is nullptr\n" );
+		assert( "AudioBus::StartMeter | Meter component is nullptr\n" );
 		return false;
 #endif
 	}
@@ -427,7 +337,7 @@ bool AudioChannel::StartMeter( PluginFactory inMeterFactory, SoundEngine* inSoun
 	if ( !MeterEffect.editControllerPtr )
 	{
 #if DEBUG_CONFIG
-		assert( "AudioChannel::StartMeter | Meter edit controller is nullptr\n" );
+		assert( "AudioBus::StartMeter | Meter edit controller is nullptr\n" );
 		return false;
 #endif
 	}
@@ -436,7 +346,7 @@ bool AudioChannel::StartMeter( PluginFactory inMeterFactory, SoundEngine* inSoun
 	if ( !MeterEffect.audioProcessorPtr )
 	{
 #if DEBUG_CONFIG
-		assert( "AudioChannel::StartMeter | Meter audio processor is nullptr\n" );
+		assert( "AudioBus::StartMeter | Meter audio processor is nullptr\n" );
 		return false;
 #endif
 	}
@@ -470,37 +380,35 @@ bool AudioChannel::StartMeter( PluginFactory inMeterFactory, SoundEngine* inSoun
 	if ( compCP ) compCP->release();
 	if ( ctrlCP ) ctrlCP->release();
 
-	/*for ( int indexParameter = 0; indexParameter < MeterEffect.editControllerPtr->getParameterCount(); indexParameter++ )
+	Vst::ChannelContext::IInfoListener* infoListener = nullptr;
+	if ( ChannelStripEffect.editControllerPtr->queryInterface(
+		Vst::ChannelContext::IInfoListener::iid, (void**)&infoListener ) == kResultOk
+		&& infoListener )
 	{
-		Vst::ParameterInfo parameter;
-		if ( MeterEffect.editControllerPtr->getParameterInfo( indexParameter, parameter ) == kResultTrue )
+		// 2. Build the attribute list
+		IPtr<Vst::IAttributeList> attrList = Vst::HostAttributeList::make();
+		if ( attrList )
 		{
-			std::wstring wstr_title( parameter.title, parameter.title + 128 );
-			wstr_title = wstr_title.substr( 0, wstr_title.find( L'\0' ) );
+			// Channel name — STR16 produces a const TChar* (UTF-16)
+			Vst::TChar channelName[ 128 ];
+			for ( int i = 0; i < 128; i++ ) { channelName[ i ] = static_cast<Vst::TChar>( Name[ i ] ); if ( !Name[ i ] ) break; }
 
-			std::wcout << "Param ID: " << parameter.id
-				<< " |Name: " << wstr_title
-				<< " |Default: " << parameter.defaultNormalizedValue
-				<< std::endl;
+			// Compute character count manually (no wcslen dependency)
+			int64 nameLen = 0;
+			while ( channelName[ nameLen ] != Vst::TChar( 0 ) ) ++nameLen;
+
+			attrList->setString( Vst::ChannelContext::kChannelNameKey, channelName );
+			attrList->setInt( Vst::ChannelContext::kChannelNameLengthKey, nameLen );
+
+			// Channel index (1-based) and color (ARGB)
+			attrList->setInt( Vst::ChannelContext::kChannelIndexKey, (int64)Number + 1 );
+			attrList->setInt( Vst::ChannelContext::kChannelColorKey, (int64)0xFF29A3CC );
+
+			// Push to the plugin
+			infoListener->setChannelContextInfos( attrList );
 		}
-
-	}*/
-
-	//Vst::ChannelContext::IInfoListener* infoListener = nullptr;
-	//MeterEffect.componentPtr->queryInterface(
-	//	Vst::ChannelContext::IInfoListener::iid,
-	//	(void**)&infoListener
-	//);
-
-	//if ( !infoListener )
-	//{
-	//	printf( "[VST3] IInfoListener not supported\n" );
-	//	return false;
-	//}
-
-	//// Communicate attribute list
-
-	//infoListener->release();
+		infoListener->release();
+	}
 
 	IPlugView* view = nullptr;
 	if ( MeterEffect.editControllerPtr )
@@ -509,7 +417,7 @@ bool AudioChannel::StartMeter( PluginFactory inMeterFactory, SoundEngine* inSoun
 		if ( view )
 		{
 #if DEBUG_CONFIG
-			printf( "Creating Meter window for Channel %s\n", ChannelName.c_str() );
+			printf( "Creating Meter window for Channel %s\n", Name.c_str() );
 #endif
 			// Create a native Win32 window to host it
 			HWND hwnd = CreateWindowExW(

@@ -7,15 +7,14 @@
 #include "pluginterfaces/vst/ivstplugview.h"
 #include "pluginterfaces/gui/iplugview.h"  
 #include <format>
-#include "Ak/WwiseAuthoringAPI/waapi.h"
 #include "pluginterfaces/vst/ivstmessage.h"
 #include "pluginterfaces/vst/ivsthostapplication.h"
 #include "pluginterfaces/vst/vsttypes.h"
 
 
-SoundEngine SoundEngine::gSoundEngine;
+ReactionSoundEngine ReactionSoundEngine::gSoundEngine;
 
-bool SoundEngine::LoadSoundEngineConfiguration( EMixingDeskOperatingMode OperatingMode )
+bool ReactionSoundEngine::LoadSoundEngineConfiguration( EMixingDeskOperatingMode OperatingMode )
 {
 	switch ( OperatingMode )
 	{
@@ -115,37 +114,13 @@ bool SoundEngine::LoadSoundEngineConfiguration( EMixingDeskOperatingMode Operati
 			bShouldLoadWwiseSoundEngine = false;
 			bShouldUseAsioAsTimingMechanism = true;
 			break;
-		case EMixingDeskOperatingMode::WWISE_CONTROL_SURFACE:
-			SelectedAsioDevice = EAsioDevice::NONE;
-			SelectedChannelConfiguration = EChannelConfiguration::MONO;
-			SelectedChannelStripModel = EChannelStripModel::FOUR_THOUSAND_E;
-			bShouldLoadAudioProcessing = false;
-			bShouldLoadWwiseSoundEngine = false;
-			bShouldUseAsioAsTimingMechanism = false;
-			break;
-		case EMixingDeskOperatingMode::WWISE_SOUNDENGINE_RECORD_EXTERNAL:
-			SelectedAsioDevice = EAsioDevice::NONE;
-			SelectedChannelConfiguration = EChannelConfiguration::MONO;
-			SelectedChannelStripModel = EChannelStripModel::FOUR_THOUSAND_E;
-			bShouldLoadAudioProcessing = true;
-			bShouldLoadWwiseSoundEngine = false;
-			bShouldUseAsioAsTimingMechanism = true;
-			break;
-		case EMixingDeskOperatingMode::WWISE_SOUNDENGINE_RECORD_INTERNAL:
-			SelectedAsioDevice = EAsioDevice::NONE;
-			SelectedChannelConfiguration = EChannelConfiguration::MONO;
-			SelectedChannelStripModel = EChannelStripModel::FOUR_THOUSAND_E;
-			bShouldLoadAudioProcessing = true;
-			bShouldLoadWwiseSoundEngine = true;
-			bShouldUseAsioAsTimingMechanism = true;
-			break;
 		default:
 			break;
 	}
 	return true;
 }
 
-bool SoundEngine::InitializeASIODevice()
+bool ReactionSoundEngine::InitializeASIODevice()
 {
 	asioInitialized = false;
 	if ( !LoadAsioDriver( SelectedAsioDevice ) )
@@ -167,8 +142,12 @@ bool SoundEngine::InitializeASIODevice()
 	if ( CreateAsioBuffers() != ASE_OK )
 		return asioInitialized;
 
-	asioInitialized = true;
+	for ( int indexChannelCount = 0; indexChannelCount < inputChannels; indexChannelCount++ )
+	{
 
+	}
+
+	asioInitialized = true;
 	return asioInitialized;
 }
 
@@ -180,14 +159,16 @@ void OnSampleRateChange( ASIOSampleRate SampleRate )
 // Asio device buffer switch. Happens every time the buffers are swapped out
 ASIOTime* OnBufferSwitchTimeInfo( ASIOTime* Parameters, long DoubleBufferIndex, ASIOBool DirectProcess )
 {
+	if ( !ReactionSoundEngine::GetSoundEngine() )
+		return Parameters;
+
 	if ( AK::SoundEngine::IsInitialized() )
 		AK::SoundEngine::RenderAudio();
 
-	if ( !SoundEngine::GetSoundEngine() )
-		return Parameters;
+	ReactionSoundEngine::GetSoundEngine()->ProcessSignalChain();
 
-	SoundEngine::GetSoundEngine()->ProcessSignalChain();
-	//SoundEngine::GetSoundEngine()->TickSoundEngine( -1.f );
+
+
 
 	return Parameters;
 }
@@ -197,7 +178,7 @@ long OnAsioMessage( long Selector, long Value, void* Message, double* opt )
 	return 0;
 }
 
-bool SoundEngine::InitializeSignalChain()
+bool ReactionSoundEngine::InitializeSignalChain()
 {
 	signalChainInitialized = false;
 
@@ -262,22 +243,14 @@ bool SoundEngine::InitializeSignalChain()
 		case EChannelConfiguration::STEREO:
 			totalInstances = inputChannels / 2;;
 			break;
-		case EChannelConfiguration::QUAD:
-			totalInstances = inputChannels / 4;
-			break;
-		case EChannelConfiguration::SURROUND:
-			totalInstances = inputChannels / 6;
-			break;
-		case EChannelConfiguration::SURROUND_REAR:
-			totalInstances = inputChannels / 6;
-			break;
 	}
 
 	for ( int indexChannels = 0; indexChannels < totalInstances; indexChannels++ )
 	{
-		AudioChannel* newChannel = new AudioChannel();
-		newChannel->ChannelName = "Track " + indexChannels;
-		printf( "Initializing Channel %i : %s", indexChannels, newChannel->ChannelName.c_str() );
+		AudioBus* newChannel = new AudioBus();
+		newChannel->Name = "Track " + to_string( indexChannels );
+		newChannel->Number = indexChannels;
+		//printf( "Initializing Channel %i : %s", indexChannels, newChannel->Name.c_str() );
 		switch ( SelectedChannelStripModel )
 		{
 			case EChannelStripModel::NATIVE:
@@ -293,10 +266,10 @@ bool SoundEngine::InitializeSignalChain()
 				break;
 		}
 
-		if ( !newChannel->InitializeChannel( this, SelectedChannelConfiguration, false, false ) )
+		if ( !newChannel->InitializeBus( this, SelectedChannelConfiguration, false, false ) )
 		{
 #if DEBUG_CONFIG
-			assert( "Failed to initialize Channel %i : %s", indexChannels, newChannel->ChannelName );
+			assert( "Failed to initialize Channel %i : %s", indexChannels, newChannel->Name );
 #endif
 			return signalChainInitialized;
 		}
@@ -309,20 +282,13 @@ bool SoundEngine::InitializeSignalChain()
 	return signalChainInitialized;
 }
 
-bool SoundEngine::ProcessSignalChain()
+bool ReactionSoundEngine::ProcessSignalChain()
 {
-	return false;
-}
-
-bool SoundEngine::InitializeControlSurface()
-{
-	// Connect to MIDI device for SSL Channel 1
-
 	return false;
 }
 
 // Initializes the Wwise Sound Engine with default memory settings.
-bool SoundEngine::InitializeWwiseSoundEngine()
+bool ReactionSoundEngine::InitializeWwiseSoundEngine()
 {
 	wwiseSoundEngineInitialized = false;
 	// Init memory settings
@@ -399,18 +365,14 @@ bool SoundEngine::InitializeWwiseSoundEngine()
 	return wwiseSoundEngineInitialized;
 }
 
-bool SoundEngine::LinkToWwiseAuthoring()
-{
+using namespace AK;
 
-	return false;
-}
-
-bool SoundEngine::TerminateWwiseComms()
+bool ReactionSoundEngine::TerminateWwiseComms()
 {
 	return false;
 }
 
-bool SoundEngine::TerminateWwiseSoundEngine()
+bool ReactionSoundEngine::TerminateWwiseSoundEngine()
 {
 	// Terminate WAAPI comms. Has to be done first
 	AK::Comm::Term();
@@ -431,7 +393,7 @@ bool SoundEngine::TerminateWwiseSoundEngine()
 	return true;
 }
 
-bool SoundEngine::TerminateSoundEngine()
+bool ReactionSoundEngine::TerminateSoundEngine()
 {
 	// Terminate WAAPI comms. Has to be done first
 	AK::Comm::Term();
@@ -451,26 +413,30 @@ bool SoundEngine::TerminateSoundEngine()
 	return true;
 }
 
-bool SoundEngine::ReloadSoundEngine()
+bool ReactionSoundEngine::ReloadSoundEngine()
 {
 	return false;
 }
 
-bool SoundEngine::LoadAsioDriver( EAsioDevice ChosenAsioDevice )
+bool ReactionSoundEngine::LoadAsioDriver( EAsioDevice ChosenAsioDevice )
 {
 	if ( !AsioDriver )
 		AsioDriver = new AsioDrivers();
 
 	if ( AsioDriver )
 	{
+		char driverName[ 32 ];
 		switch ( ChosenAsioDevice )
 		{
 			case EAsioDevice::VASIO_64:
-				return AsioDriver->loadDriver( VASIO_64_DRIVER );
+				strcpy( driverName, VASIO_64_DRIVER );
+				return AsioDriver->loadDriver( driverName );
 			case EAsioDevice::VASIO_256:
-				return AsioDriver->loadDriver( VASIO_256_DRIVER );
+				strcpy( driverName, VASIO_256_DRIVER );
+				return AsioDriver->loadDriver( driverName );
 			case EAsioDevice::VASIO_512:
-				return AsioDriver->loadDriver( VASIO_512_DRIVER );
+				strcpy( driverName, VASIO_512_DRIVER );
+				return AsioDriver->loadDriver( driverName );
 			case EAsioDevice::NONE:
 				return false;
 			default:
@@ -481,7 +447,7 @@ bool SoundEngine::LoadAsioDriver( EAsioDevice ChosenAsioDevice )
 	return false;
 }
 
-long SoundEngine::InitializeAsioStaticData( /*AudioDeviceDriverInfo* DriverInfo*/ )
+long ReactionSoundEngine::InitializeAsioStaticData( /*AudioDeviceDriverInfo* DriverInfo*/ )
 {
 	// collect the informational data of the driver
 		// get the number of available channels
@@ -537,10 +503,10 @@ long SoundEngine::InitializeAsioStaticData( /*AudioDeviceDriverInfo* DriverInfo*
 	return -1;
 }
 
-ASIOError SoundEngine::CreateAsioBuffers()
+ASIOError ReactionSoundEngine::CreateAsioBuffers()
 {
 	// create buffers for all inputs and outputs of the card with the 
-		// preferredSize from ASIOGetBufferSize() as buffer size
+	// preferredSize from ASIOGetBufferSize() as buffer size
 	long i;
 	ASIOError result;
 
@@ -552,6 +518,7 @@ ASIOError SoundEngine::CreateAsioBuffers()
 		inputBuffers = MAX_INPUT_CHANNELS;
 	else
 		inputBuffers = inputChannels;
+
 	for ( i = 0; i < inputBuffers; i++, info++ )
 	{
 		info->isInput = ASIOTrue;
@@ -601,72 +568,72 @@ ASIOError SoundEngine::CreateAsioBuffers()
 	return result;
 }
 
-AKRESULT SoundEngine::SetupListener()
+AKRESULT ReactionSoundEngine::SetupListener()
 {
 	return AKRESULT::AK_Success;
 }
 
-AKRESULT SoundEngine::RegisterGameObject()
+AKRESULT ReactionSoundEngine::RegisterGameObject()
 {
 	return AKRESULT::AK_Success;
 }
 
-AKRESULT SoundEngine::UnregisterGameObject()
+AKRESULT ReactionSoundEngine::UnregisterGameObject()
 {
 	return AKRESULT::AK_Success;
 }
 
-AKRESULT SoundEngine::LoadBank()
+AKRESULT ReactionSoundEngine::LoadBank()
 {
 	return AKRESULT::AK_Success;
 }
 
-AKRESULT SoundEngine::UnloadBank()
+AKRESULT ReactionSoundEngine::UnloadBank()
 {
 	return AKRESULT::AK_Success;
 }
 
-AKRESULT SoundEngine::PostAudioEvent()
+AKRESULT ReactionSoundEngine::PostAudioEvent()
 {
 	return AKRESULT::AK_Success;
 }
 
-AKRESULT SoundEngine::PauseSoundEngine()
+AKRESULT ReactionSoundEngine::PauseSoundEngine()
 {
 	return AKRESULT::AK_Success;
 }
 
-AKRESULT SoundEngine::StopAll()
+AKRESULT ReactionSoundEngine::StopAll()
 {
 	return AKRESULT::AK_Success;
 }
 
-AKRESULT SoundEngine::SetMultiplePositions()
+AKRESULT ReactionSoundEngine::SetMultiplePositions()
 {
 	return AKRESULT::AK_Success;
 }
 
-AKRESULT SoundEngine::SetAuxSends()
+AKRESULT ReactionSoundEngine::SetAuxSends()
 {
 	return AKRESULT::AK_Success;
 }
 
-AKRESULT SoundEngine::SetInSpatialAudioRoom()
+AKRESULT ReactionSoundEngine::SetInSpatialAudioRoom()
 {
 	return AKRESULT::AK_Success;
 }
 
-AKRESULT SoundEngine::SetStateValue()
+AKRESULT ReactionSoundEngine::SetStateValue()
 {
 	return AKRESULT::AK_Success;
 }
 
-AKRESULT SoundEngine::SetSwitchValue()
+AKRESULT ReactionSoundEngine::SetSwitchValue()
 {
 	return AKRESULT::AK_Success;
 }
 
-AKRESULT SoundEngine::SetRtpcValue()
+AKRESULT ReactionSoundEngine::SetRtpcValue()
 {
 	return AKRESULT::AK_Success;
 }
