@@ -420,3 +420,5 @@ FodyWeavers.xsd
 wwise_projects/
 _project/
 project/out/
+
+desktop.ini
