@@ -1,0 +1,1 @@
+// Class that represents a single instance of plugin information. Designed to represent between 1-12 audio channels on a single fader

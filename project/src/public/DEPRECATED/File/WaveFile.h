@@ -1,1 +1,0 @@
-// Header information for the wav file
