@@ -3,7 +3,35 @@
 #
 cmake_minimum_required (VERSION 3.10)
 include(FetchContent)
+find_package(Git QUIET)
 
+if(GIT_FOUND)
+    execute_process(
+        COMMAND ${GIT_EXECUTABLE} rev-list --count HEAD
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        OUTPUT_VARIABLE GIT_COMMIT_COUNT
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+    execute_process(
+        COMMAND ${GIT_EXECUTABLE} rev-parse --short HEAD
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        OUTPUT_VARIABLE GIT_COMMIT_HASH
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+else()
+    set(GIT_COMMIT_COUNT "0")
+    set(GIT_COMMIT_HASH "unknown")
+endif()
+
+set(RMD_MAJOR_NUMBER "0")
+set(RMD_MINOR_NUMBER "1")
+set(RMD_BUILD_NUMBER ${GIT_COMMIT_COUNT})
+
+add_compile_definitions(RMD_MAJOR_NUMBER=0)
+add_compile_definitions(RMD_MINOR_NUMBER=1)
+add_compile_definitions(RMD_BUILD_NUMBER=${GIT_COMMIT_COUNT})
+add_compile_definitions(RMD_VERSION_STRING="${RMD_MAJOR_NUMBER}.${RMD_MINOR_NUMBER}.${RMD_BUILD_NUMBER}")
+add_compile_definitions(ASIO_DEVICE_NAME="VB-Matrix VASIO-512")
 
 # Enable Hot Reload for MSVC compilers if supported.
 if (POLICY CMP0141)
@@ -63,6 +91,14 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(simpleini)
 
+FetchContent_Declare( 
+	rapidjson
+	GIT_REPOSITORY	https://github.com/Tencent/rapidjson.git
+	GIT_TAG			master
+)
+FetchContent_MakeAvailable(rapidjson)
+
+
 
 # MAIN REACTION MIXING DESK APPLICATION
 
@@ -70,14 +106,14 @@ file(GLOB_RECURSE REACTIONMIXINGDESK_SOURCE
 "src/controlsurface/*cpp"
 "src/soundengine/*cpp"
 "src/timeline/*cpp"
-"src/wwise/*cpp"
+"src/wwise-host/*cpp"
 )
 
 file(GLOB_RECURSE REACTIONMIXINGDESK_HEADER
 "src/controlsurface/*h"
 "src/soundengine/*h"
 "src/timeline/*h"
-"src/wwise/*h"
+"src/wwise-host/*h"
 "src/*h"
 )
 
@@ -90,6 +126,7 @@ target_include_directories(ReactionMixingDesk PUBLIC
  "${rtmidi_SOURCE_DIR}"
  "${simpleini_SOURCE_DIR}"
  "${vst3sdk_SOURCE_DIR}"
+ "${rapidjson_SOURCE_DIR}/include"
 )
 
 
@@ -127,8 +164,9 @@ if(CMAKE_SIZEOF_VOID_P EQUAL 8)
 	endif()
 	target_compile_definitions(ReactionMixingDesk PRIVATE IEEE754_64FLOAT=1)
 
+
 configure_file(
     ${CMAKE_SOURCE_DIR}/config/settings.ini
-    ${CMAKE_BINARY_DIR}/${CMAKE_BUILD_TYPE}/settings.ini
+    ${CMAKE_BINARY_DIR}/settings.ini
     COPYONLY
 )

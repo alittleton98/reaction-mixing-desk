@@ -7,3 +7,8 @@
 #include <thread>
 
 using namespace std;
+
+const string DEFAULT_AUDIO_BUS_NAMES[] =
+{
+	""
+};
