@@ -98,8 +98,6 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(rapidjson)
 
-
-
 # MAIN REACTION MIXING DESK APPLICATION
 
 file(GLOB_RECURSE REACTIONMIXINGDESK_SOURCE
@@ -117,7 +115,8 @@ file(GLOB_RECURSE REACTIONMIXINGDESK_HEADER
 "src/*h"
 )
 
-add_executable (ReactionMixingDesk WIN32 "src/mains/ReactionMixingDesk.cpp" "src/resources/reaction-mixing-desk.rc" ${REACTIONMIXINGDESK_HEADER} ${REACTIONMIXINGDESK_SOURCE})
+add_executable (ReactionMixingDesk WIN32 "src/mains/ReactionMixingDesk.cpp" "src/resources/reaction-mixing-desk.rc" ${REACTIONMIXINGDESK_HEADER} ${REACTIONMIXINGDESK_SOURCE} )
+
 target_include_directories(ReactionMixingDesk PUBLIC 
 "${WWISE_SDK_PATH}/include" 
 "${WWISE_SDK_PATH}/samples" 
@@ -129,12 +128,15 @@ target_include_directories(ReactionMixingDesk PUBLIC
  "${rapidjson_SOURCE_DIR}/include"
 )
 
+target_link_libraries(ReactionMixingDesk PRIVATE
+    sdk_hosting
+    base
+    pluginterfaces
+)
 
 if (CMAKE_VERSION VERSION_GREATER 3.12)
   set_property(TARGET ReactionMixingDesk PROPERTY CXX_STANDARD 20)
 endif()
-
-
 
 # Global Definitions
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")

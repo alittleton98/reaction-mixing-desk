@@ -1,5 +1,6 @@
 #include "ReactionSoundEngine.h"
-
+#include "pluginterfaces/vst/ivstmessage.h"
+//#include "public.sdk/source/vst/utility/stringconvert.cpp"
 void OnSampleRateChange( ASIOSampleRate SampleRate );
 ASIOTime* OnBufferSwitchTimeInfo( ASIOTime* Parameters, long DoubleBufferIndex, ASIOBool DirectProcess );
 long OnAsioMessage( long Selector, long Value, void* Message, double* opt );
@@ -30,17 +31,40 @@ bool ReactionSoundEngine::TerminateSoundEngine()
 
 tresult PLUGIN_API ReactionSoundEngine::getName( Vst::String128 name )
 {
-	return 0;
+	return Vst::StringConvert::convert( "Reaction Mixing Desk", name ) ? kResultTrue : kInternalError;
 }
+
 tresult PLUGIN_API ReactionSoundEngine::createInstance( TUID cid, TUID _iid, void** obj )
 {
-	return 0;
+	if ( FUnknownPrivate::iidEqual( cid, Vst::IMessage::iid ) &&
+		FUnknownPrivate::iidEqual( _iid, Vst::IMessage::iid ) )
+	{
+		*obj = new Vst::HostMessage;
+		return kResultTrue;
+	}
+	if ( FUnknownPrivate::iidEqual( cid, Vst::IAttributeList::iid ) &&
+		FUnknownPrivate::iidEqual( _iid, Vst::IAttributeList::iid ) )
+	{
+		if ( auto al = Vst::HostAttributeList::make() )
+		{
+			*obj = al.take();
+			return kResultTrue;
+		}
+		return kOutOfMemory;
+	}
+	*obj = nullptr;
+	return kResultFalse;
 }
 
 //-----------------------------------------------------------------------------
 tresult PLUGIN_API ReactionSoundEngine::queryInterface( const char* _iid, void** obj )
 {
+	QUERY_INTERFACE( _iid, obj, FUnknown::iid, IHostApplication )
+		QUERY_INTERFACE( _iid, obj, IHostApplication::iid, IHostApplication )
 
+
+
+		* obj = nullptr;
 	return kResultFalse;
 }
 
