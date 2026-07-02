@@ -226,15 +226,16 @@ ASIOTime* OnBufferSwitchTimeInfo( ASIOTime* Parameters, long DoubleBufferIndex, 
 	long channelCount = ASIO_DEVICE_DEFAULT_CHANNELS;
 	for ( int indexChannel = 0; indexChannel < channelCount; indexChannel++ )
 	{
-		// bufferInfos are 0 to inputChannels + (inputChannels + 1) to (inputChannels + outputChannels)
-		// buffers selected are one of the two that the ASIO device is not reading at the time
+		// Retrieve buffers
 		void* inputBuffer = soundEngine->mBufferInfos[ indexChannel ].buffers[ DoubleBufferIndex ];
 		void* outputBuffer = soundEngine->mBufferInfos[ soundEngine->mInputChannels + indexChannel ].buffers[ DoubleBufferIndex ];
 
 		size_t bytesPerSample = GetBytesPerSample( soundEngine->mChannelInfos[ indexChannel ].type );
 		size_t bytesPerBuffer = bytesPerSample * soundEngine->mAsioBufferPreferredSize;
+
+		// In place processing example.
 #if defined RUN_SIN_TEST
-		if ( indexChannel == 0 || indexChannel == 1 )
+		if ( indexChannel == 0 )
 		{
 			static double phase = 0.0;
 			const double phaseIncrement = 2.0 * M_PI * 440.0 / soundEngine->mSampleRate; // 440 Hz tone
@@ -242,7 +243,26 @@ ASIOTime* OnBufferSwitchTimeInfo( ASIOTime* Parameters, long DoubleBufferIndex, 
 			float* buffer = reinterpret_cast<float*>( inputBuffer );
 			for ( int i = 0; i < 512; i++ )
 			{
-				buffer[ i ] = 0.5f * static_cast<float>( std::sin( phase ) );
+				buffer[ i ] += 0.1f * static_cast<float>( std::sin( phase ) );
+				if ( buffer[ i ] > 1.f )
+					buffer[ i ] = 1.f; // Clamp at the ceiling
+				phase += phaseIncrement;
+				if ( phase >= 2.0 * M_PI )
+					phase -= 2.0 * M_PI;
+			}
+		}
+
+		if ( indexChannel == 1 )
+		{
+			static double phase = 0.0;
+			const double phaseIncrement = 2.0 * M_PI * 440.0 / soundEngine->mSampleRate; // 440 Hz tone
+
+			float* buffer = reinterpret_cast<float*>( inputBuffer );
+			for ( int i = 0; i < 512; i++ )
+			{
+				buffer[ i ] += 0.1f * static_cast<float>( std::sin( phase ) );
+				if ( buffer[ i ] > 1.f )
+					buffer[ i ] = 1.f; // Clamp at the ceiling
 				phase += phaseIncrement;
 				if ( phase >= 2.0 * M_PI )
 					phase -= 2.0 * M_PI;

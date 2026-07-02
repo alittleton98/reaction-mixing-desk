@@ -71,6 +71,10 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(asio)
 
+if (EXISTS "${asio_SOURCE_DIR}/host/sample/hostsample.cpp")
+	file(REMOVE_RECURSE "${asio_SOURCE_DIR}/host/sample/hostsample.cpp")
+endif()
+
 FetchContent_Declare( 
 	rtmidi
 	GIT_REPOSITORY	https://github.com/thestk/rtmidi.git
@@ -130,6 +134,7 @@ target_include_directories(ReactionMixingDesk PUBLIC
  "${CMAKE_CURRENT_SOURCE_DIR}/src"
  "${asio_SOURCE_DIR}/common"
  "${asio_SOURCE_DIR}/host"
+ "${asio_SOURCE_DIR}/host/pc"
  "${rtmidi_SOURCE_DIR}"
  "${simpleini_SOURCE_DIR}"
  "${vst3sdk_SOURCE_DIR}"
