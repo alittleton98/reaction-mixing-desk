@@ -32,6 +32,7 @@ add_compile_definitions(RMD_MINOR_NUMBER=1)
 add_compile_definitions(RMD_BUILD_NUMBER=${GIT_COMMIT_COUNT})
 add_compile_definitions(RMD_VERSION_STRING="${RMD_MAJOR_NUMBER}.${RMD_MINOR_NUMBER}.${RMD_BUILD_NUMBER}")
 add_compile_definitions(ASIO_DEVICE_NAME="VB-Matrix VASIO-512")
+#add_compile_definitions(RUN_SIN_TEST)
 
 # Enable Hot Reload for MSVC compilers if supported.
 if (POLICY CMP0141)

@@ -40,12 +40,14 @@ using namespace Steinberg;
 void OnSampleRateChange( ASIOSampleRate SampleRate );
 size_t GetBytesPerSample( ASIOSampleType sampleType );
 ASIOTime* OnBufferSwitchTimeInfo( ASIOTime* Parameters, long DoubleBufferIndex, ASIOBool DirectProcess );
+void OnBufferSwitch( long doubleBufferIndex, ASIOBool directProcess );
 long OnAsioMessage( long Selector, long Value, void* Message, double* opt );
 
 #define MAX_INPUT_CHANNELS 512
 #define MAX_OUTPUT_CHANNELS 512
 #define DEFAULT_SAMPLERATE 48000
 #define ASIO_DEVICE_DEFAULT_CHANNELS 512
+#define M_PI 3.14159265358979323846
 
 enum class EChannelConfiguration : unsigned short
 {

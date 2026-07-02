@@ -145,6 +145,9 @@ bool ReactionSoundEngine::InitializeASIODevice()
 		return false;
 	}
 
+	if ( ASIOStart() != ASE_OK )
+		return false;
+
 	bAsioDeviceInitialized = true;
 	return bAsioDeviceInitialized;
 }
@@ -186,12 +189,11 @@ void OnSampleRateChange( ASIOSampleRate SampleRate )
 
 }
 
-// Asio device buffer switch. Happens every time the buffers are swapped out
-ASIOTime* OnBufferSwitchTimeInfo( ASIOTime* Parameters, long DoubleBufferIndex, ASIOBool DirectProcess )
+void OnBufferSwitch( long doubleBufferIndex, ASIOBool directProcess )
 {
 	ReactionSoundEngine* soundEngine = ReactionSoundEngine::Get();
 	if ( !soundEngine )
-		return Parameters;
+		return;
 
 	if ( AK::SoundEngine::IsInitialized() )
 		AK::SoundEngine::RenderAudio();
@@ -201,13 +203,54 @@ ASIOTime* OnBufferSwitchTimeInfo( ASIOTime* Parameters, long DoubleBufferIndex, 
 	{
 		// bufferInfos are 0 to inputChannels + (inputChannels + 1) to (inputChannels + outputChannels)
 		// buffers selected are one of the two that the ASIO device is not reading at the time
-		void* inputBuffer = soundEngine->mBufferInfos[ channelCount ].buffers[ DoubleBufferIndex ];
-		void* outputbuffer = soundEngine->mBufferInfos[ soundEngine->mInputChannels + indexChannel ].buffers[ DoubleBufferIndex ];
+		void* inputBuffer = soundEngine->mBufferInfos[ channelCount ].buffers[ doubleBufferIndex ];
+		void* outputBuffer = soundEngine->mBufferInfos[ soundEngine->mInputChannels + indexChannel ].buffers[ doubleBufferIndex ];
 
 		size_t bytesPerSample = GetBytesPerSample( soundEngine->mChannelInfos[ indexChannel ].type );
 		size_t bytesPerBuffer = bytesPerSample * soundEngine->mAsioBufferPreferredSize;
 
-		memcpy( outputbuffer, inputBuffer, bytesPerBuffer );
+		memcpy( inputBuffer, outputBuffer, bytesPerBuffer );
+	}
+}
+
+// Asio device buffer switch. Happens every time the buffers are swapped out
+ASIOTime* OnBufferSwitchTimeInfo( ASIOTime* Parameters, long DoubleBufferIndex, ASIOBool DirectProcess )
+{
+	ReactionSoundEngine* soundEngine = ReactionSoundEngine::Get();
+	if ( !soundEngine )
+		return Parameters;
+
+	/*if ( AK::SoundEngine::IsInitialized() )
+		AK::SoundEngine::RenderAudio();*/
+
+	long channelCount = ASIO_DEVICE_DEFAULT_CHANNELS;
+	for ( int indexChannel = 0; indexChannel < channelCount; indexChannel++ )
+	{
+		// bufferInfos are 0 to inputChannels + (inputChannels + 1) to (inputChannels + outputChannels)
+		// buffers selected are one of the two that the ASIO device is not reading at the time
+		void* inputBuffer = soundEngine->mBufferInfos[ indexChannel ].buffers[ DoubleBufferIndex ];
+		void* outputBuffer = soundEngine->mBufferInfos[ soundEngine->mInputChannels + indexChannel ].buffers[ DoubleBufferIndex ];
+
+		size_t bytesPerSample = GetBytesPerSample( soundEngine->mChannelInfos[ indexChannel ].type );
+		size_t bytesPerBuffer = bytesPerSample * soundEngine->mAsioBufferPreferredSize;
+#if defined RUN_SIN_TEST
+		if ( indexChannel == 0 || indexChannel == 1 )
+		{
+			static double phase = 0.0;
+			const double phaseIncrement = 2.0 * M_PI * 440.0 / soundEngine->mSampleRate; // 440 Hz tone
+
+			float* buffer = reinterpret_cast<float*>( inputBuffer );
+			for ( int i = 0; i < 512; i++ )
+			{
+				buffer[ i ] = 0.5f * static_cast<float>( std::sin( phase ) );
+				phase += phaseIncrement;
+				if ( phase >= 2.0 * M_PI )
+					phase -= 2.0 * M_PI;
+			}
+		}
+#endif
+		// Passthrough signal
+		memcpy( outputBuffer, inputBuffer, bytesPerBuffer );
 	}
 
 	return Parameters;
@@ -215,6 +258,17 @@ ASIOTime* OnBufferSwitchTimeInfo( ASIOTime* Parameters, long DoubleBufferIndex, 
 
 long OnAsioMessage( long Selector, long Value, void* Message, double* opt )
 {
+	switch ( Selector )
+	{
+		case kAsioSelectorSupported:
+			if ( Value == kAsioSupportsTimeInfo )
+				return 1;   // yes, we support it
+			return 0;
+
+		case kAsioSupportsTimeInfo:
+			return 1;       // <-- THIS is the actual switch to time-info mode
+
+	}
 	return 0;
 }
 #pragma endregion 
@@ -284,7 +338,6 @@ ASIOError ReactionSoundEngine::CreateAsioBuffers()
 	ASIOError result;
 
 	// fill the mBufferInfos from the start without a gap
-	ASIOBufferInfo* info = mBufferInfos;
 
 	// prepare inputs (Though this is not necessaily required, no opened inputs will work, too
 	if ( mInputChannels > MAX_INPUT_CHANNELS )
@@ -292,11 +345,11 @@ ASIOError ReactionSoundEngine::CreateAsioBuffers()
 	else
 		mInputBuffers = mInputChannels;
 
-	for ( i = 0; i < mInputBuffers; i++, info++ )
+	for ( i = 0; i < mInputBuffers; i++ )
 	{
-		info->isInput = ASIOTrue;
-		info->channelNum = i;
-		info->buffers[ 0 ] = info->buffers[ 1 ] = 0;
+		mBufferInfos[ i ].isInput = ASIOTrue;
+		mBufferInfos[ i ].channelNum = i;
+		mBufferInfos[ i ].buffers[ 0 ] = mBufferInfos[ i ].buffers[ 1 ] = 0;
 	}
 
 	// prepare outputs
@@ -304,11 +357,11 @@ ASIOError ReactionSoundEngine::CreateAsioBuffers()
 		mOutputBuffers = MAX_OUTPUT_CHANNELS;
 	else
 		mOutputBuffers = mOutputChannels;
-	for ( i = 0; i < mOutputBuffers; i++, info++ )
+	for ( i = mInputBuffers; i < mInputBuffers + mOutputBuffers; i++ )
 	{
-		info->isInput = ASIOFalse;
-		info->channelNum = i;
-		info->buffers[ 0 ] = info->buffers[ 1 ] = 0;
+		mBufferInfos[ i ].isInput = ASIOFalse;
+		mBufferInfos[ i ].channelNum = i - mInputBuffers;
+		mBufferInfos[ i ].buffers[ 0 ] = mBufferInfos[ i ].buffers[ 1 ] = 0;
 	}
 
 	mAsioCallbacks.bufferSwitchTimeInfo = &OnBufferSwitchTimeInfo;
