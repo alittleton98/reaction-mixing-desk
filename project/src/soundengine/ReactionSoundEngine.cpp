@@ -1,5 +1,9 @@
 #include "ReactionSoundEngine.h"
 #include "pluginterfaces/vst/ivstmessage.h"
+#include "minwindef.h"
+
+ReactionSoundEngine ReactionSoundEngine::globalSoundEngine;
+
 //#include "public.sdk/source/vst/utility/stringconvert.cpp"
 void OnSampleRateChange( ASIOSampleRate SampleRate );
 ASIOTime* OnBufferSwitchTimeInfo( ASIOTime* Parameters, long DoubleBufferIndex, ASIOBool DirectProcess );
@@ -21,6 +25,8 @@ bool ReactionSoundEngine::UnloadSoundEngineConfiguration()
 
 bool ReactionSoundEngine::InitializeSoundEngine()
 {
+
+
 	return true;
 }
 
@@ -56,7 +62,6 @@ tresult PLUGIN_API ReactionSoundEngine::createInstance( TUID cid, TUID _iid, voi
 	return kResultFalse;
 }
 
-//-----------------------------------------------------------------------------
 tresult PLUGIN_API ReactionSoundEngine::queryInterface( const char* _iid, void** obj )
 {
 	QUERY_INTERFACE( _iid, obj, FUnknown::iid, IHostApplication )
@@ -68,13 +73,11 @@ tresult PLUGIN_API ReactionSoundEngine::queryInterface( const char* _iid, void**
 	return kResultFalse;
 }
 
-//-----------------------------------------------------------------------------
 uint32 PLUGIN_API ReactionSoundEngine::addRef()
 {
 	return 1;
 }
 
-//-----------------------------------------------------------------------------
 uint32 PLUGIN_API ReactionSoundEngine::release()
 {
 	return 1;
@@ -86,7 +89,7 @@ bool ReactionSoundEngine::InitializeASIODevice()
 	if ( bAsioDeviceInitialized )
 	{
 #if DEBUG_CONFIG
-		printf( "ReactionSoundEngine::InitializeASIODevice | ASIO Device already initialized. Terminate running instance first" );
+		printf( "ReactionSoundEngine::InitializeASIODevice | ASIO Device already initialized. Terminate running instance first\n" );
 #endif
 		return false;
 	}
@@ -95,26 +98,26 @@ bool ReactionSoundEngine::InitializeASIODevice()
 		mAsioDriver = new AsioDrivers();
 
 	bool driverLoaded = false;
+	char driverName[ 32 ];
 	if ( mAsioDriver )
 	{
-#if DEBUG_CONFIG
-		printf( "Loading ASIO driver for Reaction Mixing Desk" );
-#endif
-		char driverName[ 32 ];
 		strcpy( driverName, ASIO_DEVICE_NAME );
+#if DEBUG_CONFIG
+		printf( "Loading ASIO driver %s for Reaction Mixing Desk\n", driverName );
+#endif
 		driverLoaded = mAsioDriver->loadDriver( driverName );
 	}
 
 	if ( !driverLoaded )
 	{
 #if DEBUG_CONFIG
-		printf( "Failed to load ASIO driver" );
+		printf( "Failed to load ASIO driver: %s\n", driverName );
 #endif
 		return bAsioDeviceInitialized;
 	}
 
 	bool asioDriverInitialized = false;
-	asioDriverInitialized = ( ASIOInit( &mDriverInfo ) != ASE_OK );
+	asioDriverInitialized = ( ASIOInit( &mDriverInfo ) == ASE_OK );
 	if ( !asioDriverInitialized )
 	{
 #if DEBUG_CONFIG
@@ -134,15 +137,87 @@ bool ReactionSoundEngine::InitializeASIODevice()
 
 	if ( InitializeAsioStaticData() != 0 )
 	{
+		return false;
 	}
 
 	if ( CreateAsioBuffers() != ASE_OK )
 	{
+		return false;
 	}
 
-	bAsioDeviceInitialized = driverLoaded;
+	bAsioDeviceInitialized = true;
 	return bAsioDeviceInitialized;
 }
+
+#pragma region ASIO_FUNCTIONS
+size_t GetBytesPerSample( ASIOSampleType sampleType )
+{
+	switch ( sampleType )
+	{
+		case ASIOSTInt16LSB:
+		case ASIOSTInt16MSB:
+			return 2;
+
+		case ASIOSTInt24LSB:
+		case ASIOSTInt24MSB:
+			return 3;
+
+		case ASIOSTInt32LSB:
+		case ASIOSTInt32MSB:
+		case ASIOSTFloat32LSB:
+		case ASIOSTFloat32MSB:
+		case ASIOSTInt32LSB16:
+		case ASIOSTInt32LSB18:
+		case ASIOSTInt32LSB20:
+		case ASIOSTInt32LSB24:
+			return 4;
+
+		case ASIOSTFloat64LSB:
+		case ASIOSTFloat64MSB:
+			return 8;
+
+		default:
+			assert( false );
+	}
+}
+
+void OnSampleRateChange( ASIOSampleRate SampleRate )
+{
+
+}
+
+// Asio device buffer switch. Happens every time the buffers are swapped out
+ASIOTime* OnBufferSwitchTimeInfo( ASIOTime* Parameters, long DoubleBufferIndex, ASIOBool DirectProcess )
+{
+	ReactionSoundEngine* soundEngine = ReactionSoundEngine::Get();
+	if ( !soundEngine )
+		return Parameters;
+
+	if ( AK::SoundEngine::IsInitialized() )
+		AK::SoundEngine::RenderAudio();
+
+	long channelCount = ASIO_DEVICE_DEFAULT_CHANNELS;
+	for ( int indexChannel = 0; indexChannel < channelCount; indexChannel++ )
+	{
+		// bufferInfos are 0 to inputChannels + (inputChannels + 1) to (inputChannels + outputChannels)
+		// buffers selected are one of the two that the ASIO device is not reading at the time
+		void* inputBuffer = soundEngine->mBufferInfos[ channelCount ].buffers[ DoubleBufferIndex ];
+		void* outputbuffer = soundEngine->mBufferInfos[ soundEngine->mInputChannels + indexChannel ].buffers[ DoubleBufferIndex ];
+
+		size_t bytesPerSample = GetBytesPerSample( soundEngine->mChannelInfos[ indexChannel ].type );
+		size_t bytesPerBuffer = bytesPerSample * soundEngine->mAsioBufferPreferredSize;
+
+		memcpy( outputbuffer, inputBuffer, bytesPerBuffer );
+	}
+
+	return Parameters;
+}
+
+long OnAsioMessage( long Selector, long Value, void* Message, double* opt )
+{
+	return 0;
+}
+#pragma endregion 
 
 long ReactionSoundEngine::InitializeAsioStaticData( /*AudioDeviceDriverInfo* DriverInfo*/ )
 {
@@ -235,6 +310,10 @@ ASIOError ReactionSoundEngine::CreateAsioBuffers()
 		info->channelNum = i;
 		info->buffers[ 0 ] = info->buffers[ 1 ] = 0;
 	}
+
+	mAsioCallbacks.bufferSwitchTimeInfo = &OnBufferSwitchTimeInfo;
+	mAsioCallbacks.asioMessage = &OnAsioMessage;
+	mAsioCallbacks.sampleRateDidChange = &OnSampleRateChange;
 
 	// create and activate buffers
 	result = ASIOCreateBuffers( mBufferInfos,

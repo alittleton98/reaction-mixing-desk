@@ -115,13 +115,20 @@ file(GLOB_RECURSE REACTIONMIXINGDESK_HEADER
 "src/*h"
 )
 
-add_executable (ReactionMixingDesk WIN32 "src/mains/ReactionMixingDesk.cpp" "src/resources/reaction-mixing-desk.rc" ${REACTIONMIXINGDESK_HEADER} ${REACTIONMIXINGDESK_SOURCE} )
+file(GLOB_RECURSE ASIOSDK_SOURCE
+"${asio_SOURCE_DIR}/host/*.cpp"
+"${asio_SOURCE_DIR}/host/pc/*.cpp"
+"${asio_SOURCE_DIR}/common/asio.cpp"
+)
+
+add_executable (ReactionMixingDesk "src/mains/ReactionMixingDesk.cpp" "src/resources/reaction-mixing-desk.rc" ${REACTIONMIXINGDESK_HEADER} ${REACTIONMIXINGDESK_SOURCE} ${ASIOSDK_SOURCE})
 
 target_include_directories(ReactionMixingDesk PUBLIC 
 "${WWISE_SDK_PATH}/include" 
 "${WWISE_SDK_PATH}/samples" 
  "${CMAKE_CURRENT_SOURCE_DIR}/src"
- "${asio_SOURCE_DIR}"
+ "${asio_SOURCE_DIR}/common"
+ "${asio_SOURCE_DIR}/host"
  "${rtmidi_SOURCE_DIR}"
  "${simpleini_SOURCE_DIR}"
  "${vst3sdk_SOURCE_DIR}"
@@ -132,6 +139,7 @@ target_link_libraries(ReactionMixingDesk PRIVATE
     sdk_hosting
     base
     pluginterfaces
+	sdk_common
 )
 
 if (CMAKE_VERSION VERSION_GREATER 3.12)
@@ -148,23 +156,23 @@ else()
 endif()
 
 if(CMAKE_SIZEOF_VOID_P EQUAL 8) 
-		if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-			file(GLOB WWISE_LIBS "${WWISE_SDK_PATH}/x64_vc170/Debug/lib/*.lib")
-			foreach (libfile IN LISTS WWISE_LIBS)
-				message(STATUS "Linking Debug Wwise libs to Debug configuration: ${libfile}")
-			endforeach()
-			target_link_libraries(ReactionMixingDesk PRIVATE ${WWISE_LIBS} ws2_32)
-		# Use Profile configuration because we need to be able to communicate with the Sound Engine
-		elseif(CMAKE_BUILD_TYPE STREQUAL "Release")	
-			file(GLOB WWISE_LIBS "${WWISE_SDK_PATH}/x64_vc170/Profile/lib/*.lib")
-			target_link_libraries(ReactionMixingDesk PRIVATE ${WWISE_LIBS} ws2_32)
-		else()
-			message(FATAL_ERROR "Unsupported build configuration. Use Debug or Release")
-		endif()
+	if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+		file(GLOB WWISE_LIBS "${WWISE_SDK_PATH}/x64_vc170/Debug/lib/*.lib")
+		foreach (libfile IN LISTS WWISE_LIBS)
+			message(STATUS "Linking Debug Wwise libs to Debug configuration: ${libfile}")
+		endforeach()
+		target_link_libraries(ReactionMixingDesk PRIVATE ${WWISE_LIBS} ws2_32)
+	# Use Profile configuration because we need to be able to communicate with the Sound Engine
+	elseif(CMAKE_BUILD_TYPE STREQUAL "Release")	
+		file(GLOB WWISE_LIBS "${WWISE_SDK_PATH}/x64_vc170/Profile/lib/*.lib")
+		target_link_libraries(ReactionMixingDesk PRIVATE ${WWISE_LIBS} ws2_32)
 	else()
-		message(FATAL_ERROR "Unsupported architecture. Chaotic pointer size")
+		message(FATAL_ERROR "Unsupported build configuration. Use Debug or Release")
 	endif()
-	target_compile_definitions(ReactionMixingDesk PRIVATE IEEE754_64FLOAT=1)
+else()
+	message(FATAL_ERROR "Unsupported architecture. Chaotic pointer size")
+endif()
+target_compile_definitions(ReactionMixingDesk PRIVATE IEEE754_64FLOAT=1)
 
 
 configure_file(

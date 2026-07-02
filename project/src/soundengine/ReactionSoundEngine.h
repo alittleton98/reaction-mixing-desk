@@ -28,9 +28,9 @@
 #pragma endregion
 
 #pragma region ASIO_INCLUDES
-#include "common/asio.h"
-#include "common/asiosys.h"
-#include "host/asiodrivers.h"
+#include "asio.h"
+#include "asiosys.h"
+#include "asiodrivers.h"
 #pragma endregion
 
 #include "RtMidi.h"
@@ -38,12 +38,14 @@
 using namespace Steinberg;
 
 void OnSampleRateChange( ASIOSampleRate SampleRate );
+size_t GetBytesPerSample( ASIOSampleType sampleType );
 ASIOTime* OnBufferSwitchTimeInfo( ASIOTime* Parameters, long DoubleBufferIndex, ASIOBool DirectProcess );
 long OnAsioMessage( long Selector, long Value, void* Message, double* opt );
 
 #define MAX_INPUT_CHANNELS 512
 #define MAX_OUTPUT_CHANNELS 512
 #define DEFAULT_SAMPLERATE 48000
+#define ASIO_DEVICE_DEFAULT_CHANNELS 512
 
 enum class EChannelConfiguration : unsigned short
 {
@@ -101,41 +103,41 @@ public:
 	// Sound Engine Loop
 	void SoundEngineLoopFunc( float deltaTime );
 
-private:
+public:
 	bool bAsioDeviceInitialized = false;
 
 	// ASIO
 	ASIODriverInfo mDriverInfo;
 	ASIOCallbacks mAsioCallbacks;
 	AsioDrivers* mAsioDriver = 0;
-	long mInputChannels;
-	long mOutputChannels;
+	long mInputChannels = 0;
+	long mOutputChannels = 0;
 	// ASIOGetBufferSize()
-	long mAsioBufferMinSize;
-	long mAsioBufferMaxSize;
-	long mAsioBufferPreferredSize;
-	long mAsioBufferGranularity;
+	long mAsioBufferMinSize = 0;
+	long mAsioBufferMaxSize = 0;
+	long mAsioBufferPreferredSize = 0;
+	long mAsioBufferGranularity = 0;
 	// ASIOGetSampleRate()
 	ASIOSampleRate mSampleRate;
 	// ASIOOutputReady()
-	bool mOutputReady;
+	bool mOutputReady = false;
 	// ASIOGetLatencies ()
-	long mInputLatency;
-	long mOutputLatency;
+	long mInputLatency = 0;
+	long mOutputLatency = 0;
 	// ASIOCreateBuffers ()
-	long mInputBuffers;	// becomes number of actual created input buffers
-	long mOutputBuffers;	// becomes number of actual created output buffers
+	long mInputBuffers = 0;	// becomes number of actual created input buffers
+	long mOutputBuffers = 0;	// becomes number of actual created output buffers
 	ASIOBufferInfo mBufferInfos[ MAX_INPUT_CHANNELS + MAX_OUTPUT_CHANNELS ]; // buffer info's
 	// ASIOGetChannelInfo()
 	ASIOChannelInfo mChannelInfos[ MAX_INPUT_CHANNELS + MAX_OUTPUT_CHANNELS ]; // channel info's
 	// The above two arrays share the same indexing, as the data in them are linked together
 	// Information from ASIOGetSamplePosition()
 	// data is converted to double floats for easier use, however 64 bit integer can be used, too
-	double nanoSeconds;
-	double samples;
-	double tcSamples;	// time code samples
+	double nanoSeconds = 0;
+	double samples = 0;
+	double tcSamples = 0;	// time code samples
 
 	// bufferSwitchTimeInfo()
 	ASIOTime tInfo;			// time info state
-	unsigned long sysRefTime;      // system reference time, when bufferSwitch() was called
+	unsigned long sysRefTime = 0;      // system reference time, when bufferSwitch() was called
 };
