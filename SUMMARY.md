@@ -4,7 +4,7 @@
 
 ## Mixing Desk
 
-* [Mixing Desk](mixing-desk/mixing-desk.md)
+* [Mixing Desk](mixing-desk/readme.md)
 
 ## Audio Server
 
