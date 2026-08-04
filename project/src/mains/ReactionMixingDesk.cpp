@@ -26,7 +26,6 @@ int main()
 	if ( !soundEngine->InitializeASIODevice() )
 	{
 		printf( "Sound Engine failed to intialized asio device \n" );
-
 	}
 
 
