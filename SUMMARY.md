@@ -1,3 +1,3 @@
 # Table of contents
 
-* [Reaction Mixing Desk](README.md)
+* [Reaction Mixing System](README.md)
