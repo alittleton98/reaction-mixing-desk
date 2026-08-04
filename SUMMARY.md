@@ -4,4 +4,12 @@
 
 ## Mixing Desk
 
-* [Page 1](mixing-desk/page-1.md)
+* [Mixing Desk](mixing-desk/mixing-desk.md)
+
+## Audio Server
+
+* [Audio Server](audio-server/audio-server.md)
+
+## Audio Plugin
+
+* [Audio Plugins](audio-plugin/audio-plugins.md)
