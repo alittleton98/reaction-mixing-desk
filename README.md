@@ -12,3 +12,5 @@ The Reaction Mixing System has 3 main parts
 2. Audio Server - The server application that controls the transport and property information for each client of the mixing desk. The server is not authoritative on its own, but is instead essentially a broadcast aggregate for the Slave clients and an interpreter for the Master. The server is not required when running the client locally
 3. Audio Plugin - The audio plugin sends or receives data from the desired audio applications. The Mixing System does not make sound on its own so it requires a source. The audio plugin is the source of any audio data used by the mixing system. It is also capable of receiving endpoint data from the Mixing Desk's mix graph as well.&#x20;
 
+If the Desk is spun up in offline mode, a Server is not launched and the Mixing Desk is expected to connect to any other applications/sources via LAN or shared memory.
+
