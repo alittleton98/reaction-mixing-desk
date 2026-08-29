@@ -1,6 +1,6 @@
 # Reaction Mixing System
 
-The Reaction Mixing System is an all digital studio application suite designed to grant extensive control over the mix process for realtime interactive experiences. ReaMS is primarily built for the video game industry, but can be utilized for other real time experiences with your authoring tool/engine of choice.
+The Reaction Mixing System is an all digital studio application suite designed to grant extensive control over the mix process for realtime interactive experiences. RMS is primarily built for the video game industry, but can be utilized for other real time experiences with your authoring tool/engine of choice.
 
 The mixing desk application is built with the SSL UF Series Control Surface hardware. The Desk is purpose built for mixing in the box  for your chosen sound engine and operating as a digital version of an analog mixing Desk. Input for the desk is from shared memory pages that are loaded from audio processing plugins of different formats.
 
